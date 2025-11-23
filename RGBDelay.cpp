@@ -145,34 +145,30 @@ Render (
 	if (PF_WORLD_IS_DEEP(output)) {
 		// 16-bit
 		A_long rowbytes = output->rowbytes;
-		for (int y = 0; y < height; y++) {
-			PF_Pixel16 *in_row = (PF_Pixel16*)((char*)input_worldP->data + y * rowbytes);
-			PF_Pixel16 *out_row = (PF_Pixel16*)((char*)output_worldP->data + y * rowbytes);
-			
-			for (int x = 0; x < width; x++) {
-				int rx = std::min((int)width - 1, std::max(0, x - r_delay));
-				int gx = std::min((int)width - 1, std::max(0, x - g_delay));
-				int bx = std::min((int)width - 1, std::max(0, x - b_delay));
-				
-				out_row[x].alpha = in_row[x].alpha;
+	for (int y = 0; y < height; y++) {
+		PF_Pixel16 *in_row = (PF_Pixel16*)((char*)input_worldP->data + y * rowbytes);
+		PF_Pixel16 *out_row = (PF_Pixel16*)((char*)output_worldP->data + y * rowbytes);
+		
+		for (int x = 0; x < width; x++) {
+			int rx = (std::min)((int)width - 1, (std::max)(0, x - r_delay));
+			int gx = (std::min)((int)width - 1, (std::max)(0, x - g_delay));
+			int bx = (std::min)((int)width - 1, (std::max)(0, x - b_delay));				out_row[x].alpha = in_row[x].alpha;
 				out_row[x].red = in_row[rx].red;
 				out_row[x].green = in_row[gx].green;
 				out_row[x].blue = in_row[bx].blue;
 			}
 		}
 	} else {
-		// 8-bit
-		A_long rowbytes = output->rowbytes;
-		for (int y = 0; y < height; y++) {
-			PF_Pixel8 *in_row = (PF_Pixel8*)((char*)input_worldP->data + y * rowbytes);
-			PF_Pixel8 *out_row = (PF_Pixel8*)((char*)output_worldP->data + y * rowbytes);
-			
-			for (int x = 0; x < width; x++) {
-				int rx = std::min((int)width - 1, std::max(0, x - r_delay));
-				int gx = std::min((int)width - 1, std::max(0, x - g_delay));
-				int bx = std::min((int)width - 1, std::max(0, x - b_delay));
-				
-				out_row[x].alpha = in_row[x].alpha;
+	// 8-bit
+	A_long rowbytes = output->rowbytes;
+	for (int y = 0; y < height; y++) {
+		PF_Pixel8 *in_row = (PF_Pixel8*)((char*)input_worldP->data + y * rowbytes);
+		PF_Pixel8 *out_row = (PF_Pixel8*)((char*)output_worldP->data + y * rowbytes);
+		
+		for (int x = 0; x < width; x++) {
+			int rx = (std::min)((int)width - 1, (std::max)(0, x - r_delay));
+			int gx = (std::min)((int)width - 1, (std::max)(0, x - g_delay));
+			int bx = (std::min)((int)width - 1, (std::max)(0, x - b_delay));				out_row[x].alpha = in_row[x].alpha;
 				out_row[x].red = in_row[rx].red;
 				out_row[x].green = in_row[gx].green;
 				out_row[x].blue = in_row[bx].blue;
