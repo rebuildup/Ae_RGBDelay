@@ -170,9 +170,9 @@ Render (
 			}
 		}
 		
-		ERR2(PF_CHECKIN_PARAM(in_data, &blue_layer));
-		ERR2(PF_CHECKIN_PARAM(in_data, &green_layer));
-		ERR2(PF_CHECKIN_PARAM(in_data, &red_layer));
+		PF_CHECKIN_PARAM(in_data, &blue_layer);
+		PF_CHECKIN_PARAM(in_data, &green_layer);
+		PF_CHECKIN_PARAM(in_data, &red_layer);
 	}
 
 	return err;
