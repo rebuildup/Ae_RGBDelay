@@ -33,7 +33,7 @@ GlobalSetup (
 										BUILD_VERSION);
 	
 	out_data->out_flags =  PF_OutFlag_DEEP_COLOR_AWARE;
-	out_data->out_flags2 = PF_OutFlag2_SUPPORTS_THREADED_RENDERING | PF_OutFlag2_FLOAT_COLOR_AWARE;
+	out_data->out_flags2 = PF_OutFlag2_SUPPORTS_THREADED_RENDERING;
 	
 	return PF_Err_NONE;
 }
@@ -124,7 +124,47 @@ Render (
 	// 										output_worldP));
 	
 	// Fix: Use PF_COPY for now to avoid bad parameter error (NULL callback)
-	ERR(PF_COPY(input_worldP, output_worldP, NULL, NULL));
+	// ERR(PF_COPY(input_worldP, output_worldP, NULL, NULL));
+	
+	// Implement simple RGB Delay
+	PF_COPY(input_worldP, output_worldP, NULL, NULL);
+	
+	// We need to read from input and write to output with offsets
+	// Since we already copied, we can just read from input (which is safe) and overwrite output
+	
+	A_long width = output->width;
+	A_long height = output->height;
+	
+	// 8-bit implementation for now
+	if (!PF_WORLD_IS_DEEP(output)) {
+		A_u_char *in_data_ptr = (A_u_char*)input_worldP->data;
+		A_u_char *out_data_ptr = (A_u_char*)output_worldP->data;
+		A_long rowbytes = output->rowbytes;
+		
+		int r_delay = (int)red_delay;
+		int g_delay = (int)green_delay;
+		int b_delay = (int)blue_delay;
+		
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				// Red
+				int rx = std::min((int)width - 1, std::max(0, x - r_delay));
+				// Green
+				int gx = std::min((int)width - 1, std::max(0, x - g_delay));
+				// Blue
+				int bx = std::min((int)width - 1, std::max(0, x - b_delay));
+				
+				A_u_char *p_out = out_data_ptr + y * rowbytes + x * 4;
+				
+				p_out[1] = (in_data_ptr + y * rowbytes + rx * 4)[1]; // Red
+				p_out[2] = (in_data_ptr + y * rowbytes + gx * 4)[2]; // Green
+				p_out[3] = (in_data_ptr + y * rowbytes + bx * 4)[3]; // Blue
+			}
+		}
+	}
+
+	return err;
+}
 
 	return err;
 }
