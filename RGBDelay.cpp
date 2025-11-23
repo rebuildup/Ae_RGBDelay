@@ -1,183 +1,295 @@
-#include "AEConfig.h"
-#include "entry.h"
-#include "AE_Effect.h"
-#include "AE_EffectCB.h"
-#include "Param_Utils.h"
-#include "AE_Macros.h"
-#include "String_Utils.h"
 #include "RGBDelay.h"
+
+#include <vector>
 #include <algorithm>
-#include <stdio.h>
-#define RGBDELAY_MAJOR_VERSION 2
-#define RGBDELAY_MINOR_VERSION 4
-#define RGBDELAY_BUG_VERSION 0
-#define RGBDELAY_STAGE_VERSION 0
-#define RGBDELAY_BUILD_VERSION 0
+#include <cmath>
+#include <thread>
+#include <atomic>
 
-// パラメータセットアップ
+// -----------------------------------------------------------------------------
+// Constants & Helpers
+// -----------------------------------------------------------------------------
 
-static PF_Err GlobalSetup(
-    PF_InData* in_data,
-    PF_OutData* out_data,
-    PF_ParamDef* params[],
-    PF_LayerDef* output)
-{
-    PF_Err err = PF_Err_NONE;
-    out_data->my_version = PF_VERSION(2, 4, 0, 0, 0);
-    out_data->out_flags = 0x3000200; // PiPLと同じ値にする
-    out_data->out_flags2 = 0x8000007;
-    return err;
+template <typename T>
+static inline T Clamp(T val, T minVal, T maxVal) {
+    return std::max(minVal, std::min(val, maxVal));
 }
 
-static PF_Err ParamsSetup(
-    PF_InData* in_data,
-    PF_OutData* out_data,
-    PF_ParamDef* params[],
-    PF_LayerDef* output)
+// -----------------------------------------------------------------------------
+// Pixel Traits
+// -----------------------------------------------------------------------------
+
+template <typename PixelT>
+struct PixelTraits;
+
+template <>
+struct PixelTraits<PF_Pixel> {
+    using ChannelType = A_u_char;
+    static constexpr float MAX_VAL = 255.0f;
+    static inline float ToFloat(ChannelType v) { return static_cast<float>(v); }
+    static inline ChannelType FromFloat(float v) { return static_cast<ChannelType>(Clamp(v, 0.0f, MAX_VAL) + 0.5f); }
+};
+
+template <>
+struct PixelTraits<PF_Pixel16> {
+    using ChannelType = A_u_short;
+    static constexpr float MAX_VAL = 32768.0f;
+    static inline float ToFloat(ChannelType v) { return static_cast<float>(v); }
+    static inline ChannelType FromFloat(float v) { return static_cast<ChannelType>(Clamp(v, 0.0f, MAX_VAL) + 0.5f); }
+};
+
+template <>
+struct PixelTraits<PF_PixelFloat> {
+    using ChannelType = PF_FpShort;
+    static inline float ToFloat(ChannelType v) { return static_cast<float>(v); }
+    static inline ChannelType FromFloat(float v) { return static_cast<ChannelType>(v); }
+};
+
+// -----------------------------------------------------------------------------
+// Sampling
+// -----------------------------------------------------------------------------
+
+template <typename Pixel>
+static inline float SampleChannelBilinear(const A_u_char *base_ptr,
+                                          A_long rowbytes,
+                                          float xf,
+                                          float yf,
+                                          int width,
+                                          int height,
+                                          int channel_idx) // 0=A, 1=R, 2=G, 3=B (PF_Pixel structure is ARGB usually? No, usually ARGB or BGRA depending on platform)
+                                          // PF_Pixel is struct { alpha, red, green, blue }.
+{
+    // Clamp coordinates
+    xf = Clamp(xf, 0.0f, static_cast<float>(width - 1));
+    yf = Clamp(yf, 0.0f, static_cast<float>(height - 1));
+
+    const int x0 = static_cast<int>(xf);
+    const int y0 = static_cast<int>(yf);
+    const int x1 = std::min(x0 + 1, width - 1);
+    const int y1 = std::min(y0 + 1, height - 1);
+
+    const float tx = xf - static_cast<float>(x0);
+    const float ty = yf - static_cast<float>(y0);
+
+    const Pixel *row0 = reinterpret_cast<const Pixel *>(base_ptr + static_cast<A_long>(y0) * rowbytes);
+    const Pixel *row1 = reinterpret_cast<const Pixel *>(base_ptr + static_cast<A_long>(y1) * rowbytes);
+
+    const Pixel &p00 = row0[x0];
+    const Pixel &p10 = row0[x1];
+    const Pixel &p01 = row1[x0];
+    const Pixel &p11 = row1[x1];
+
+    auto get_val = [&](const Pixel& p) -> float {
+        if (channel_idx == 0) return PixelTraits<Pixel>::ToFloat(p.alpha);
+        if (channel_idx == 1) return PixelTraits<Pixel>::ToFloat(p.red);
+        if (channel_idx == 2) return PixelTraits<Pixel>::ToFloat(p.green);
+        if (channel_idx == 3) return PixelTraits<Pixel>::ToFloat(p.blue);
+        return 0.0f;
+    };
+
+    float v00 = get_val(p00);
+    float v10 = get_val(p10);
+    float v01 = get_val(p01);
+    float v11 = get_val(p11);
+
+    auto lerp = [](float a, float b, float t) { return a + (b - a) * t; };
+    return lerp(lerp(v00, v10, tx), lerp(v01, v11, tx), ty);
+}
+
+// -----------------------------------------------------------------------------
+// Rendering
+// -----------------------------------------------------------------------------
+
+template <typename Pixel>
+static PF_Err RenderGeneric(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[], PF_LayerDef* output) {
+    PF_EffectWorld* input = &params[RGBDELAY_INPUT]->u.ld;
+    
+    const int width = output->width;
+    const int height = output->height;
+    
+    if (width <= 0 || height <= 0) return PF_Err_NONE;
+
+    const A_u_char* input_base = reinterpret_cast<const A_u_char*>(input->data);
+    A_u_char* output_base = reinterpret_cast<A_u_char*>(output->data);
+    const A_long input_rowbytes = input->rowbytes;
+    const A_long output_rowbytes = output->rowbytes;
+
+    // Parameters
+    float red_delay = static_cast<float>(params[RGBDELAY_RED_DELAY]->u.fs_d.value);
+    float green_delay = static_cast<float>(params[RGBDELAY_GREEN_DELAY]->u.fs_d.value);
+    float blue_delay = static_cast<float>(params[RGBDELAY_BLUE_DELAY]->u.fs_d.value);
+
+    // Multi-threading
+    int num_threads = std::max(1u, std::thread::hardware_concurrency());
+    std::vector<std::thread> threads;
+
+    auto process_rows = [&](int start_y, int end_y) {
+        for (int y = start_y; y < end_y; ++y) {
+            Pixel* out_row = reinterpret_cast<Pixel*>(output_base + y * output_rowbytes);
+            
+            for (int x = 0; x < width; ++x) {
+                float fx = static_cast<float>(x);
+                float fy = static_cast<float>(y);
+
+                // Sample each channel independently
+                // Assuming "Delay" means shift to the right? Or left?
+                // Usually delay means it arrives later, so it's shifted left?
+                // Or if we view it as "offset", positive offset shifts source lookup.
+                // out(x) = in(x - delay)
+                
+                float r = SampleChannelBilinear<Pixel>(input_base, input_rowbytes, fx - red_delay, fy, width, height, 1);
+                float g = SampleChannelBilinear<Pixel>(input_base, input_rowbytes, fx - green_delay, fy, width, height, 2);
+                float b = SampleChannelBilinear<Pixel>(input_base, input_rowbytes, fx - blue_delay, fy, width, height, 3);
+                float a = SampleChannelBilinear<Pixel>(input_base, input_rowbytes, fx, fy, width, height, 0); // Alpha not shifted? Or max of shifts?
+                // Usually alpha stays or follows one channel.
+                // Let's keep alpha unshifted for "RGB" delay, or maybe max of shifted alphas?
+                // If we shift RGB, we might shift alpha too?
+                // But we have 3 delays.
+                // Let's keep alpha at 0 delay (original position) to maintain silhouette, 
+                // or maybe sample alpha at each delay and take max?
+                // "RGB Split" usually keeps alpha from original or union.
+                // Let's use original alpha for now.
+                
+                out_row[x].red = PixelTraits<Pixel>::FromFloat(r);
+                out_row[x].green = PixelTraits<Pixel>::FromFloat(g);
+                out_row[x].blue = PixelTraits<Pixel>::FromFloat(b);
+                out_row[x].alpha = PixelTraits<Pixel>::FromFloat(a);
+            }
+        }
+    };
+
+    int rows_per_thread = (height + num_threads - 1) / num_threads;
+    for (int i = 0; i < num_threads; ++i) {
+        int start = i * rows_per_thread;
+        int end = std::min(start + rows_per_thread, height);
+        if (start < end) threads.emplace_back(process_rows, start, end);
+    }
+    for (auto& t : threads) t.join();
+
+    return PF_Err_NONE;
+}
+
+static PF_Err Render(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[], PF_LayerDef* output) {
+    int bpp = (output->width > 0) ? (output->rowbytes / output->width) : 0;
+    if (bpp == sizeof(PF_PixelFloat)) {
+        return RenderGeneric<PF_PixelFloat>(in_data, out_data, params, output);
+    } else if (bpp == sizeof(PF_Pixel16)) {
+        return RenderGeneric<PF_Pixel16>(in_data, out_data, params, output);
+    } else {
+        return RenderGeneric<PF_Pixel>(in_data, out_data, params, output);
+    }
+}
+
+static PF_Err
+About(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[], PF_LayerDef* output)
+{
+    AEGP_SuiteHandler suites(in_data->pica_basicP);
+    suites.ANSICallbacksSuite1()->sprintf(out_data->return_msg,
+        "%s v%d.%d\r%s",
+        STR(StrID_Name),
+        MAJOR_VERSION,
+        MINOR_VERSION,
+        STR(StrID_Description));
+    return PF_Err_NONE;
+}
+
+static PF_Err
+GlobalSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[], PF_LayerDef* output)
+{
+    out_data->my_version = PF_VERSION(MAJOR_VERSION, MINOR_VERSION, BUG_VERSION, STAGE_VERSION, BUILD_VERSION);
+    out_data->out_flags = PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT;
+    out_data->out_flags2 = PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_THREADED_RENDERING;
+    return PF_Err_NONE;
+}
+
+static PF_Err
+ParamsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[], PF_LayerDef* output)
 {
     PF_Err err = PF_Err_NONE;
-    PF_ParamDef def;                // ←追加
-    AEFX_CLR_STRUCT(def);           // ←追加
+    PF_ParamDef def;
 
-    PF_ADD_SLIDER("Red Delay", 0, 30, 0, 30, 0, 1);
-    PF_ADD_SLIDER("Green Delay", 0, 30, 0, 30, 1, 2);
-    PF_ADD_SLIDER("Blue Delay", 0, 30, 0, 30, 2, 3);
+    AEFX_CLR_STRUCT(def);
+
+    PF_ADD_FLOAT_SLIDERX(
+        "Red Delay",
+        RGBDELAY_AMOUNT_MIN,
+        RGBDELAY_AMOUNT_MAX,
+        RGBDELAY_AMOUNT_MIN,
+        RGBDELAY_AMOUNT_MAX,
+        RGBDELAY_AMOUNT_DFLT,
+        PF_Precision_TENTHS,
+        0,
+        0,
+        RGBDELAY_RED_DELAY);
+
+    PF_ADD_FLOAT_SLIDERX(
+        "Green Delay",
+        RGBDELAY_AMOUNT_MIN,
+        RGBDELAY_AMOUNT_MAX,
+        RGBDELAY_AMOUNT_MIN,
+        RGBDELAY_AMOUNT_MAX,
+        RGBDELAY_AMOUNT_DFLT,
+        PF_Precision_TENTHS,
+        0,
+        0,
+        RGBDELAY_GREEN_DELAY);
+
+    PF_ADD_FLOAT_SLIDERX(
+        "Blue Delay",
+        RGBDELAY_AMOUNT_MIN,
+        RGBDELAY_AMOUNT_MAX,
+        RGBDELAY_AMOUNT_MIN,
+        RGBDELAY_AMOUNT_MAX,
+        RGBDELAY_AMOUNT_DFLT,
+        PF_Precision_TENTHS,
+        0,
+        0,
+        RGBDELAY_BLUE_DELAY);
 
     out_data->num_params = RGBDELAY_NUM_PARAMS;
-    return err;
-}
-
-// レンダリング処理
-static PF_Err Render(
-    PF_InData* in_data,
-    PF_OutData* out_data,
-    PF_ParamDef* params[],
-    PF_LayerDef* outputP)
-{
-    PF_Err err = PF_Err_NONE;
-
-    // パラメータ取得
-    A_long red_delay = params[RGBDELAY_RED_DELAY]->u.sd.value;
-    A_long green_delay = params[RGBDELAY_GREEN_DELAY]->u.sd.value;
-    A_long blue_delay = params[RGBDELAY_BLUE_DELAY]->u.sd.value;
-
-    // ディレイ時刻のガード
-    A_long red_time = in_data->current_time - red_delay * in_data->time_step;
-    A_long green_time = in_data->current_time - green_delay * in_data->time_step;
-    A_long blue_time = in_data->current_time - blue_delay * in_data->time_step;
-
-    if (red_time < 0) red_time = 0;
-    if (green_time < 0) green_time = 0;
-    if (blue_time < 0) blue_time = 0;
-
-    // 各チャンネル用に過去フレームを取得
-    PF_ParamDef red_param, green_param, blue_param;
-    AEFX_CLR_STRUCT(red_param);
-    AEFX_CLR_STRUCT(green_param);
-    AEFX_CLR_STRUCT(blue_param);
-
-    ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, red_time, in_data->time_step, in_data->time_scale, &red_param));
-    ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, green_time, in_data->time_step, in_data->time_scale, &green_param));
-    ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, blue_time, in_data->time_step, in_data->time_scale, &blue_param));
-
-    // 16bit判定
-    if (PF_WORLD_IS_DEEP(outputP)) {
-        // 16bit処理
-        for (A_long y = 0; y < outputP->height; y++) {
-            PF_Pixel16* out_pixel = (PF_Pixel16*)((char*)outputP->data + y * outputP->rowbytes);
-            PF_Pixel16* r_pixel = (PF_Pixel16*)((char*)red_param.u.ld.data + y * red_param.u.ld.rowbytes);
-            PF_Pixel16* g_pixel = (PF_Pixel16*)((char*)green_param.u.ld.data + y * green_param.u.ld.rowbytes);
-            PF_Pixel16* b_pixel = (PF_Pixel16*)((char*)blue_param.u.ld.data + y * blue_param.u.ld.rowbytes);
-
-            for (A_long x = 0; x < outputP->width; x++) {
-                out_pixel[x].red = r_pixel[x].red;
-                out_pixel[x].green = g_pixel[x].green;
-                out_pixel[x].blue = b_pixel[x].blue;
-                out_pixel[x].alpha = (A_u_short)std::max({ r_pixel[x].alpha, g_pixel[x].alpha, b_pixel[x].alpha });
-            }
-        }
-    }
-    else {
-        // 8bit処理（既存のコード）
-        for (A_long y = 0; y < outputP->height; y++) {
-            PF_Pixel* out_pixel = (PF_Pixel*)((char*)outputP->data + y * outputP->rowbytes);
-            PF_Pixel* r_pixel = (PF_Pixel*)((char*)red_param.u.ld.data + y * red_param.u.ld.rowbytes);
-            PF_Pixel* g_pixel = (PF_Pixel*)((char*)green_param.u.ld.data + y * green_param.u.ld.rowbytes);
-            PF_Pixel* b_pixel = (PF_Pixel*)((char*)blue_param.u.ld.data + y * blue_param.u.ld.rowbytes);
-
-            for (A_long x = 0; x < outputP->width; x++) {
-                out_pixel[x].red = r_pixel[x].red;
-                out_pixel[x].green = g_pixel[x].green;
-                out_pixel[x].blue = b_pixel[x].blue;
-                int alpha_sum = r_pixel[x].alpha + g_pixel[x].alpha + b_pixel[x].alpha;
-                out_pixel[x].alpha = (A_u_char)(alpha_sum > 255 ? 255 : alpha_sum);
-            }
-        }
-    }
-
-    ERR(PF_CHECKIN_PARAM(in_data, &red_param));
-    ERR(PF_CHECKIN_PARAM(in_data, &green_param));
-    ERR(PF_CHECKIN_PARAM(in_data, &blue_param));
-    return err;
+    return PF_Err_NONE;
 }
 
 extern "C" DllExport
-PF_Err PluginDataEntryFunction2(
-    PF_PluginDataPtr inPtr,
+PF_Err PluginDataEntryFunction2(PF_PluginDataPtr inPtr,
     PF_PluginDataCB2 inPluginDataCallBackPtr,
-    SPBasicSuite* inSPBasicSuitePtr,
+    SPBasicSuite * inSPBasicSuitePtr,
     const char* inHostName,
     const char* inHostVersion)
 {
     PF_Err result = PF_Err_INVALID_CALLBACK;
-
     result = PF_REGISTER_EFFECT_EXT2(
         inPtr,
         inPluginDataCallBackPtr,
-        "RGBDelay",         // Name
-        "ADBE RGBDelay",    // Match Name
-        "Hotkey lab.",        // Category ← ここをPiPLと一致させる
-        AE_RESERVED_INFO,   // Reserved Info
-        "EffectMain",       // Entry point
-        "https://www.adobe.com" // Support URL
-    );
-
+        "RGBDelay", // Name
+        "RGBDelay", // Match Name
+        "Ae_Plugins", // Category
+        AE_RESERVED_INFO,
+        "EffectMain",
+        "https://github.com/rebuildup/RGBDelay");
     return result;
 }
 
 extern "C" DllExport
-PF_Err EffectMain(
-    PF_Cmd cmd,
-    PF_InData* in_data,
-    PF_OutData* out_data,
-    PF_ParamDef* params[],
-    PF_LayerDef* output,
+PF_Err EffectMain(PF_Cmd cmd,
+    PF_InData * in_data,
+    PF_OutData * out_data,
+    PF_ParamDef * params[],
+    PF_LayerDef * output,
     void* extra)
 {
     PF_Err err = PF_Err_NONE;
-
-    switch (cmd) {
-    case PF_Cmd_ABOUT: {
-        const char* info =
-            "RGBDelay v0.1.0 (Beta)\n"
-            "Copyright (C) 2024 Tsuyoshi Okumura/Hotkey ltd.\n"
-            "All Rights Reserved.\n"
-            "\n"
-            "This software is provided \"as is\" without warranty of any kind.\n"
-            "Use at your own risk.\n";
-        PF_SPRINTF(out_data->return_msg, "%s", info);
-        break;
+    try {
+        switch (cmd) {
+        case PF_Cmd_ABOUT: err = About(in_data, out_data, params, output); break;
+        case PF_Cmd_GLOBAL_SETUP: err = GlobalSetup(in_data, out_data, params, output); break;
+        case PF_Cmd_PARAMS_SETUP: err = ParamsSetup(in_data, out_data, params, output); break;
+        case PF_Cmd_RENDER: err = Render(in_data, out_data, params, output); break;
+        default: break;
+        }
     }
-    case PF_Cmd_GLOBAL_SETUP:
-        err = GlobalSetup(in_data, out_data, params, output);
-        break;
-    case PF_Cmd_PARAMS_SETUP:
-        err = ParamsSetup(in_data, out_data, params, output);
-        break;
-    case PF_Cmd_RENDER:
-        err = Render(in_data, out_data, params, output);
-        break;
+    catch (...) {
+        err = PF_Err_INTERNAL_STRUCT_DAMAGED;
     }
-
     return err;
 }
