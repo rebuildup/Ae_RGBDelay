@@ -59,24 +59,40 @@ static PF_Err Render(
     A_long green_delay = params[RGBDELAY_GREEN_DELAY]->u.sd.value;
     A_long blue_delay = params[RGBDELAY_BLUE_DELAY]->u.sd.value;
 
-    // �f�B���C�����̃K�[�h
+    // �f�B���C�����̃K�[�h�i�͈͓��ɃN�����v�j
     A_long red_time = in_data->current_time - red_delay * in_data->time_step;
     A_long green_time = in_data->current_time - green_delay * in_data->time_step;
     A_long blue_time = in_data->current_time - blue_delay * in_data->time_step;
 
+    // �t���[���͈̔͂��`�F�b�N
+    A_long max_time = in_data->total_time - in_data->time_step;
     if (red_time < 0) red_time = 0;
+    if (red_time > max_time) red_time = max_time;
     if (green_time < 0) green_time = 0;
+    if (green_time > max_time) green_time = max_time;
     if (blue_time < 0) blue_time = 0;
+    if (blue_time > max_time) blue_time = max_time;
 
     // �e�`�����l���p�ɉߋ��t���[�����擾
     PF_ParamDef red_param, green_param, blue_param;
     AEFX_CLR_STRUCT(red_param);
     AEFX_CLR_STRUCT(green_param);
     AEFX_CLR_STRUCT(blue_param);
+    
+    PF_Boolean checked_out_red = FALSE, checked_out_green = FALSE, checked_out_blue = FALSE;
 
     ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, red_time, in_data->time_step, in_data->time_scale, &red_param));
-    ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, green_time, in_data->time_step, in_data->time_scale, &green_param));
-    ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, blue_time, in_data->time_step, in_data->time_scale, &blue_param));
+    if (!err) checked_out_red = TRUE;
+    
+    if (!err) {
+        ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, green_time, in_data->time_step, in_data->time_scale, &green_param));
+        if (!err) checked_out_green = TRUE;
+    }
+    
+    if (!err) {
+        ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, blue_time, in_data->time_step, in_data->time_scale, &blue_param));
+        if (!err) checked_out_blue = TRUE;
+    }
 
     // 16bit����
     if (PF_WORLD_IS_DEEP(outputP)) {
@@ -113,9 +129,17 @@ static PF_Err Render(
         }
     }
 
-    ERR(PF_CHECKIN_PARAM(in_data, &red_param));
-    ERR(PF_CHECKIN_PARAM(in_data, &green_param));
-    ERR(PF_CHECKIN_PARAM(in_data, &blue_param));
+    // �`�F�b�N�C���i�`�F�b�N�A�E�g�����̂݁j
+    if (checked_out_blue) {
+        PF_CHECKIN_PARAM(in_data, &blue_param);
+    }
+    if (checked_out_green) {
+        PF_CHECKIN_PARAM(in_data, &green_param);
+    }
+    if (checked_out_red) {
+        PF_CHECKIN_PARAM(in_data, &red_param);
+    }
+    
     return err;
 }
 
