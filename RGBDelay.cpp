@@ -109,7 +109,7 @@ static PF_Err Render(
                 out_pixel[x].red = r_pixel[x].red;
                 out_pixel[x].green = g_pixel[x].green;
                 out_pixel[x].blue = b_pixel[x].blue;
-                out_pixel[x].alpha = (std::max)(r_pixel[x].alpha, (std::max)(g_pixel[x].alpha, b_pixel[x].alpha));
+                out_pixel[x].alpha = MAX(r_pixel[x].alpha, MAX(g_pixel[x].alpha, b_pixel[x].alpha));
             }
         }
     }
