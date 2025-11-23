@@ -20,6 +20,11 @@
 #include "AE_EffectCBSuites.h"
 #include "String_Utils.h"
 #include "AE_GeneralPlug.h"
+
+/* Define PF_TABLE_BITS before including AEFX_ChannelDepthTpl.h */
+#define PF_TABLE_BITS	12
+#define PF_TABLE_SZ_16	4096
+
 #include "AEFX_ChannelDepthTpl.h"
 #include "AEGP_SuiteHandler.h"
 
@@ -30,9 +35,6 @@
 #define	BUG_VERSION		0
 #define	STAGE_VERSION	PF_Stage_DEVELOP
 #define	BUILD_VERSION	1
-
-#define PF_TABLE_BITS	12
-#define PF_TABLE_SZ_16	4096
 
 #define RGBDELAY_AMOUNT_MIN   -100
 #define RGBDELAY_AMOUNT_MAX   100
