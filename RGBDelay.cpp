@@ -94,8 +94,10 @@ static PF_Err Render(
         if (!err) checked_out_blue = TRUE;
     }
 
-    // 16bit����
-    if (PF_WORLD_IS_DEEP(outputP)) {
+    // Only render if all checkouts succeeded
+    if (!err && checked_out_red && checked_out_green && checked_out_blue) {
+        // 16bit����
+        if (PF_WORLD_IS_DEEP(outputP)) {
         // 16bit����
         for (A_long y = 0; y < outputP->height; y++) {
             PF_Pixel16* out_pixel = (PF_Pixel16*)((char*)outputP->data + y * outputP->rowbytes);
@@ -128,6 +130,7 @@ static PF_Err Render(
             }
         }
     }
+    }  // End of render block
 
     // �`�F�b�N�C���i�`�F�b�N�A�E�g�����̂݁j
     if (checked_out_blue) {
