@@ -142,13 +142,8 @@ Render (
 	A_long width = output->width;
 	A_long height = output->height;
 	
-	// RGB Delay implementation
-	int r_delay = (int)red_delay;
-	int g_delay = (int)green_delay;
-	int b_delay = (int)blue_delay;
-	
-	// For spatial offset version, use frame offset as pixel offset
-	// This will be updated to temporal delay in the future
+	// RGB Delay implementation (spatial offset)
+	// Use frame offset as pixel offset for now
 	int r_delay = red_frame_offset;
 	int g_delay = green_frame_offset;
 	int b_delay = blue_frame_offset;
