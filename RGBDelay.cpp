@@ -12,10 +12,10 @@ About (
 	
 	suites.ANSICallbacksSuite1()->sprintf(	out_data->return_msg,
 											"%s v%d.%d\r%s",
-											STR(StrID_Name), 
+											"RGBDelay", 
 											MAJOR_VERSION, 
 											MINOR_VERSION, 
-											STR(StrID_Description));
+											"RGB channel delay effect");
 	return PF_Err_NONE;
 }
 
