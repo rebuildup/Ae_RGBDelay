@@ -1,29 +1,18 @@
-/*******************************************************************/
-/*                                                                 */
-/*                      ADOBE CONFIDENTIAL                         */
-/*                   _ _ _ _ _ _ _ _ _ _ _ _ _                     */
-/*                                                                 */
-/* Copyright 2007-2023 Adobe Inc.                                  */
-/* All Rights Reserved.                                            */
-/*                                                                 */
-/*******************************************************************/
-
-/*
-    RGBDelay.h
-*/
-
 #pragma once
 
 #ifndef RGBDELAY_H
 #define RGBDELAY_H
 
-#define PF_DEEP_COLOR_AWARE 1    // make sure we get 16bpc pixels;
-// AE_Effect.h checks for this.
+#define PF_DEEP_COLOR_AWARE 1
+
 #include "AEConfig.h"
-#include "entry.h"
+
 #ifdef AE_OS_WIN
-#include "string.h"
+    typedef unsigned short PixelType;
+    #include <Windows.h>
 #endif
+
+#include "entry.h"
 #include "AE_Effect.h"
 #include "AE_EffectCB.h"
 #include "AE_Macros.h"
@@ -31,26 +20,25 @@
 #include "AE_EffectCBSuites.h"
 #include "String_Utils.h"
 #include "AE_GeneralPlug.h"
+
+/* Define PF_TABLE_BITS before including AEFX_ChannelDepthTpl.h */
+#define PF_TABLE_BITS	12
+#define PF_TABLE_SZ_16	4096
+
+#include "AEFX_ChannelDepthTpl.h"
 #include "AEGP_SuiteHandler.h"
 
 #include "RGBDelay_Strings.h"
 
-#ifdef AE_OS_WIN
-#include <Windows.h>
-#endif
+#define	MAJOR_VERSION	1
+#define	MINOR_VERSION	0
+#define	BUG_VERSION		0
+#define	STAGE_VERSION	PF_Stage_DEVELOP
+#define	BUILD_VERSION	1
 
-/* Versioning information */
-
-#define    MAJOR_VERSION    1
-#define    MINOR_VERSION    0
-#define    BUG_VERSION        0
-#define    STAGE_VERSION    PF_Stage_DEVELOP
-#define    BUILD_VERSION    1
-
-/* Parameter defaults */
-#define    RGBDELAY_AMOUNT_MIN    0
-#define    RGBDELAY_AMOUNT_MAX    100
-#define    RGBDELAY_AMOUNT_DFLT    50
+#define RGBDELAY_AMOUNT_MIN   -100
+#define RGBDELAY_AMOUNT_MAX   100
+#define RGBDELAY_AMOUNT_DFLT  0
 
 enum {
     RGBDELAY_INPUT = 0,
@@ -67,17 +55,15 @@ enum {
 };
 
 extern "C" {
-
     DllExport
-        PF_Err
-        EffectMain(
-            PF_Cmd            cmd,
-            PF_InData* in_data,
-            PF_OutData* out_data,
-            PF_ParamDef* params[],
-            PF_LayerDef* output,
-            void* extra);
-
+    PF_Err
+    EffectMain(
+        PF_Cmd          cmd,
+        PF_InData       *in_data,
+        PF_OutData      *out_data,
+        PF_ParamDef     *params[],
+        PF_LayerDef     *output,
+        void            *extra);
 }
 
 #endif // RGBDELAY_H
