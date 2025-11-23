@@ -197,105 +197,11 @@ static PF_Err
 GlobalSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[], PF_LayerDef* output)
 {
     out_data->my_version = PF_VERSION(MAJOR_VERSION, MINOR_VERSION, BUG_VERSION, STAGE_VERSION, BUILD_VERSION);
-    out_data->out_flags = PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT;
-    out_data->out_flags2 = PF_OutFlag2_FLOAT_COLOR_AWARE | PF_OutFlag2_SUPPORTS_SMART_RENDER | PF_OutFlag2_SUPPORTS_THREADED_RENDERING;
+    out_data->out_flags = PF_OutFlag_DEEP_COLOR_AWARE;
     return PF_Err_NONE;
 }
 
-static void UnionLRect(const PF_LRect* src, PF_LRect* dst) {
-    if (src->left < dst->left) dst->left = src->left;
-    if (src->top < dst->top) dst->top = src->top;
-    if (src->right > dst->right) dst->right = src->right;
-    if (src->bottom > dst->bottom) dst->bottom = src->bottom;
-}
 
-static PF_Err
-PreRender(
-    PF_InData* in_data,
-    PF_OutData* out_data,
-    void* extraP)
-{
-    PF_Err err = PF_Err_NONE;
-    PF_PreRenderExtra_Local* extra = (PF_PreRenderExtra_Local*)extraP;
-    PF_RenderRequest_Local req = extra->input->output_request;
-    PF_CheckoutResult_Local in_result;
-
-    // Checkout input
-    ERR(extra->cb->checkout_layer(in_data->effect_ref,
-        RGBDELAY_INPUT,
-        RGBDELAY_INPUT,
-        &req,
-        in_data->current_time,
-        in_data->time_step,
-        in_data->time_scale,
-        &in_result));
-
-    // Set result rects
-    if (!err) {
-        UnionLRect(&in_result.result_rect, &extra->output->result_rect);
-        UnionLRect(&in_result.max_result_rect, &extra->output->max_result_rect);
-    }
-
-    return err;
-}
-
-static PF_Err
-SmartRender(
-    PF_InData* in_data,
-    PF_OutData* out_data,
-    void* extraP)
-{
-    PF_Err err = PF_Err_NONE;
-    PF_SmartRenderExtra_Local* extra = (PF_SmartRenderExtra_Local*)extraP;
-    PF_EffectWorld* input_world = NULL;
-    PF_EffectWorld* output_world = NULL;
-    
-    AEGP_SuiteHandler suites(in_data->pica_basicP);
-    PF_WorldSuite2* wsP = NULL;
-    ERR(suites.SPBasicSuite()->AcquireSuite(kPFWorldSuite, kPFWorldSuiteVersion2, (const void**)&wsP));
-
-    if (!err) {
-        // Checkout input/output
-        ERR((extra->cb->checkout_layer_pixels(in_data->effect_ref, RGBDELAY_INPUT, &input_world)));
-        ERR(extra->cb->checkout_output(in_data->effect_ref, &output_world));
-    }
-
-    if (!err && input_world && output_world) {
-        // Checkout parameters
-        PF_ParamDef p[RGBDELAY_NUM_PARAMS];
-        PF_ParamDef* pp[RGBDELAY_NUM_PARAMS];
-        
-        // Input
-        AEFX_CLR_STRUCT(p[RGBDELAY_INPUT]);
-        p[RGBDELAY_INPUT].u.ld = *input_world;
-        pp[RGBDELAY_INPUT] = &p[RGBDELAY_INPUT];
-
-        // Params
-        for (int i = 1; i < RGBDELAY_NUM_PARAMS; ++i) {
-            PF_Checkout_Value(in_data, out_data, i, in_data->current_time, in_data->time_step, in_data->time_scale, &p[i]);
-            pp[i] = &p[i];
-        }
-
-        // Call Render
-        int bpp = (output_world->width > 0) ? (output_world->rowbytes / output_world->width) : 0;
-        if (bpp == sizeof(PF_PixelFloat)) {
-            err = RenderGeneric<PF_PixelFloat>(in_data, out_data, pp, output_world);
-        } else if (bpp == sizeof(PF_Pixel16)) {
-            err = RenderGeneric<PF_Pixel16>(in_data, out_data, pp, output_world);
-        } else {
-            err = RenderGeneric<PF_Pixel>(in_data, out_data, pp, output_world);
-        }
-        
-        // Checkin params
-        for (int i = 1; i < RGBDELAY_NUM_PARAMS; ++i) {
-            PF_Checkin_Param(in_data, out_data, i, &p[i]);
-        }
-    }
-    
-    if (wsP) suites.SPBasicSuite()->ReleaseSuite(kPFWorldSuite, kPFWorldSuiteVersion2);
-
-    return err;
-}
 
 static PF_Err
 ParamsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* params[], PF_LayerDef* output)
@@ -380,8 +286,6 @@ PF_Err EffectMain(PF_Cmd cmd,
         case PF_Cmd_GLOBAL_SETUP: err = GlobalSetup(in_data, out_data, params, output); break;
         case PF_Cmd_PARAMS_SETUP: err = ParamsSetup(in_data, out_data, params, output); break;
         case PF_Cmd_RENDER: err = Render(in_data, out_data, params, output); break;
-        case PF_Cmd_SMART_PRE_RENDER: err = PreRender(in_data, out_data, extra); break;
-        case PF_Cmd_SMART_RENDER: err = SmartRender(in_data, out_data, extra); break;
         default: break;
         }
     }
