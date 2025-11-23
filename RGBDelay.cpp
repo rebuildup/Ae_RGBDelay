@@ -107,83 +107,72 @@ Render (
 	PF_Err				err		= PF_Err_NONE;
 	AEGP_SuiteHandler	suites(in_data->pica_basicP);
 
-	PF_EffectWorld *input_worldP = &params[RGBDELAY_INPUT]->u.ld;
-	PF_EffectWorld *output_worldP = output;
-
 	// Get parameter values (in frames)
-	PF_FpLong red_delay = params[RGBDELAY_RED_DELAY]->u.fs_d.value;
-	PF_FpLong green_delay = params[RGBDELAY_GREEN_DELAY]->u.fs_d.value;
-	PF_FpLong blue_delay = params[RGBDELAY_BLUE_DELAY]->u.fs_d.value;
+	int red_delay_frames = (int)(params[RGBDELAY_RED_DELAY]->u.fs_d.value);
+	int green_delay_frames = (int)(params[RGBDELAY_GREEN_DELAY]->u.fs_d.value);
+	int blue_delay_frames = (int)(params[RGBDELAY_BLUE_DELAY]->u.fs_d.value);
 	
-	// Convert to frame offsets
-	int red_frame_offset = (int)(red_delay);
-	int green_frame_offset = (int)(green_delay);
-	int blue_frame_offset = (int)(blue_delay);
-
-	// Use AEFX_ChannelDepthTpl.h to handle different bit depths
-	// ERR(suites.Iterate8Suite1()->iterate(	in_data,
-	// 										0,								
-	// 										output->height,
-	// 										input_worldP,
-	// 										NULL,
-	// 										(void*)params,
-	// 										NULL,
-	// 										output_worldP));
-	
-	// Fix: Use PF_COPY for now to avoid bad parameter error (NULL callback)
-	// ERR(PF_COPY(input_worldP, output_worldP, NULL, NULL));
-	
-	// Implement simple RGB Delay
-	PF_COPY(input_worldP, output_worldP, NULL, NULL);
-	
-	// We need to read from input and write to output with offsets
-	// Since we already copied, we can just read from input (which is safe) and overwrite output
+	A_long current_time = in_data->current_time;
+	A_long time_step = in_data->time_step;
 	
 	A_long width = output->width;
 	A_long height = output->height;
+	A_long rowbytes = output->rowbytes;
 	
-	// RGB Delay implementation (spatial offset)
-	// Use frame offset as pixel offset for now
-	int r_delay = red_frame_offset;
-	int g_delay = green_frame_offset;
-	int b_delay = blue_frame_offset;
+	// Checkout delayed frames for each channel
+	PF_ParamDef red_layer, green_layer, blue_layer;
+	AEFX_CLR_STRUCT(red_layer);
+	AEFX_CLR_STRUCT(green_layer);
+	AEFX_CLR_STRUCT(blue_layer);
 	
-	if (PF_WORLD_IS_DEEP(output)) {
-		// 16-bit
-		A_long rowbytes = output->rowbytes;
-		for (int y = 0; y < height; y++) {
-			PF_Pixel16 *in_row = (PF_Pixel16*)((char*)input_worldP->data + y * rowbytes);
-			PF_Pixel16 *out_row = (PF_Pixel16*)((char*)output_worldP->data + y * rowbytes);
-			
-			for (int x = 0; x < width; x++) {
-				int rx = (std::min)((int)width - 1, (std::max)(0, x - r_delay));
-				int gx = (std::min)((int)width - 1, (std::max)(0, x - g_delay));
-				int bx = (std::min)((int)width - 1, (std::max)(0, x - b_delay));
+	A_long red_time = current_time - (red_delay_frames * time_step);
+	A_long green_time = current_time - (green_delay_frames * time_step);
+	A_long blue_time = current_time - (blue_delay_frames * time_step);
+	
+	ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, red_time, time_step, time_step, &red_layer));
+	if (!err) ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, green_time, time_step, time_step, &green_layer));
+	if (!err) ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, blue_time, time_step, time_step, &blue_layer));
+	
+	if (!err) {
+		PF_EffectWorld *red_world = &red_layer.u.ld;
+		PF_EffectWorld *green_world = &green_layer.u.ld;
+		PF_EffectWorld *blue_world = &blue_layer.u.ld;
+		
+		if (PF_WORLD_IS_DEEP(output)) {
+			// 16-bit
+			for (int y = 0; y < height; y++) {
+				PF_Pixel16 *red_row = (PF_Pixel16*)((char*)red_world->data + y * red_world->rowbytes);
+				PF_Pixel16 *green_row = (PF_Pixel16*)((char*)green_world->data + y * green_world->rowbytes);
+				PF_Pixel16 *blue_row = (PF_Pixel16*)((char*)blue_world->data + y * blue_world->rowbytes);
+				PF_Pixel16 *out_row = (PF_Pixel16*)((char*)output->data + y * rowbytes);
 				
-				out_row[x].alpha = in_row[x].alpha;
-				out_row[x].red = in_row[rx].red;
-				out_row[x].green = in_row[gx].green;
-				out_row[x].blue = in_row[bx].blue;
+				for (int x = 0; x < width; x++) {
+					out_row[x].alpha = red_row[x].alpha;
+					out_row[x].red = red_row[x].red;
+					out_row[x].green = green_row[x].green;
+					out_row[x].blue = blue_row[x].blue;
+				}
+			}
+		} else {
+			// 8-bit
+			for (int y = 0; y < height; y++) {
+				PF_Pixel8 *red_row = (PF_Pixel8*)((char*)red_world->data + y * red_world->rowbytes);
+				PF_Pixel8 *green_row = (PF_Pixel8*)((char*)green_world->data + y * green_world->rowbytes);
+				PF_Pixel8 *blue_row = (PF_Pixel8*)((char*)blue_world->data + y * blue_world->rowbytes);
+				PF_Pixel8 *out_row = (PF_Pixel8*)((char*)output->data + y * rowbytes);
+				
+				for (int x = 0; x < width; x++) {
+					out_row[x].alpha = red_row[x].alpha;
+					out_row[x].red = red_row[x].red;
+					out_row[x].green = green_row[x].green;
+					out_row[x].blue = blue_row[x].blue;
+				}
 			}
 		}
-	} else {
-		// 8-bit
-		A_long rowbytes = output->rowbytes;
-		for (int y = 0; y < height; y++) {
-			PF_Pixel8 *in_row = (PF_Pixel8*)((char*)input_worldP->data + y * rowbytes);
-			PF_Pixel8 *out_row = (PF_Pixel8*)((char*)output_worldP->data + y * rowbytes);
-			
-			for (int x = 0; x < width; x++) {
-				int rx = (std::min)((int)width - 1, (std::max)(0, x - r_delay));
-				int gx = (std::min)((int)width - 1, (std::max)(0, x - g_delay));
-				int bx = (std::min)((int)width - 1, (std::max)(0, x - b_delay));
-				
-				out_row[x].alpha = in_row[x].alpha;
-				out_row[x].red = in_row[rx].red;
-				out_row[x].green = in_row[gx].green;
-				out_row[x].blue = in_row[bx].blue;
-			}
-		}
+		
+		ERR2(PF_CHECKIN_PARAM(in_data, &blue_layer));
+		ERR2(PF_CHECKIN_PARAM(in_data, &green_layer));
+		ERR2(PF_CHECKIN_PARAM(in_data, &red_layer));
 	}
 
 	return err;
