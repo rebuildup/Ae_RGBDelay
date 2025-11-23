@@ -49,23 +49,22 @@ resource 'PiPL' (16000) {
         },
         /* [10] */
         AE_Effect_Global_OutFlags {
-        50332160
-
+            0x02000400
         },
         AE_Effect_Global_OutFlags_2 {
-        0x8000007
+            0x08000000
         },
         /* [11] */
         AE_Effect_Match_Name {
-            "ADBE RGBDelay"
+            "361do RGBDelay"
         },
         /* [12] */
         AE_Reserved_Info {
-            8
+            0
         },
         /* [13] */
         AE_Effect_Support_URL {
-            "https://www.adobe.com"
+            "https://github.com/rebuildup/Ae_RGBDelay"
         }
     }
 };

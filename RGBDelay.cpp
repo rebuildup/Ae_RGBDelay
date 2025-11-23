@@ -14,7 +14,7 @@
 #define RGBDELAY_STAGE_VERSION 0
 #define RGBDELAY_BUILD_VERSION 0
 
-// ƒpƒ‰ƒ[ƒ^ƒZƒbƒgƒAƒbƒv
+// ï¿½pï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½^ï¿½Zï¿½bï¿½gï¿½Aï¿½bï¿½v
 
 static PF_Err GlobalSetup(
     PF_InData* in_data,
@@ -23,9 +23,9 @@ static PF_Err GlobalSetup(
     PF_LayerDef* output)
 {
     PF_Err err = PF_Err_NONE;
-    out_data->my_version = PF_VERSION(2, 4, 0, 0, 0);
-    out_data->out_flags = 0x3000200; // PiPL‚Æ“¯‚¶’l‚É‚·‚é
-    out_data->out_flags2 = 0x8000007;
+    out_data->my_version = PF_VERSION(MAJOR_VERSION, MINOR_VERSION, BUG_VERSION, STAGE_VERSION, BUILD_VERSION);
+    out_data->out_flags = PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT;
+    out_data->out_flags2 = PF_OutFlag2_SUPPORTS_THREADED_RENDERING;
     return err;
 }
 
@@ -36,8 +36,8 @@ static PF_Err ParamsSetup(
     PF_LayerDef* output)
 {
     PF_Err err = PF_Err_NONE;
-    PF_ParamDef def;                // ©’Ç‰Á
-    AEFX_CLR_STRUCT(def);           // ©’Ç‰Á
+    PF_ParamDef def;                // ï¿½ï¿½ï¿½Ç‰ï¿½
+    AEFX_CLR_STRUCT(def);           // ï¿½ï¿½ï¿½Ç‰ï¿½
 
     PF_ADD_SLIDER("Red Delay", 0, 30, 0, 30, 0, 1);
     PF_ADD_SLIDER("Green Delay", 0, 30, 0, 30, 1, 2);
@@ -47,7 +47,7 @@ static PF_Err ParamsSetup(
     return err;
 }
 
-// ƒŒƒ“ƒ_ƒŠƒ“ƒOˆ—
+// ï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½ï¿½ï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ï¿½
 static PF_Err Render(
     PF_InData* in_data,
     PF_OutData* out_data,
@@ -56,12 +56,12 @@ static PF_Err Render(
 {
     PF_Err err = PF_Err_NONE;
 
-    // ƒpƒ‰ƒ[ƒ^æ“¾
+    // ï¿½pï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½^ï¿½æ“¾
     A_long red_delay = params[RGBDELAY_RED_DELAY]->u.sd.value;
     A_long green_delay = params[RGBDELAY_GREEN_DELAY]->u.sd.value;
     A_long blue_delay = params[RGBDELAY_BLUE_DELAY]->u.sd.value;
 
-    // ƒfƒBƒŒƒC‚ÌƒK[ƒh
+    // ï¿½fï¿½Bï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ÌƒKï¿½[ï¿½h
     A_long red_time = in_data->current_time - red_delay * in_data->time_step;
     A_long green_time = in_data->current_time - green_delay * in_data->time_step;
     A_long blue_time = in_data->current_time - blue_delay * in_data->time_step;
@@ -70,7 +70,7 @@ static PF_Err Render(
     if (green_time < 0) green_time = 0;
     if (blue_time < 0) blue_time = 0;
 
-    // Šeƒ`ƒƒƒ“ƒlƒ‹—p‚É‰ß‹ƒtƒŒ[ƒ€‚ğæ“¾
+    // ï¿½eï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½lï¿½ï¿½ï¿½pï¿½É‰ß‹ï¿½ï¿½tï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½æ“¾
     PF_ParamDef red_param, green_param, blue_param;
     AEFX_CLR_STRUCT(red_param);
     AEFX_CLR_STRUCT(green_param);
@@ -80,9 +80,9 @@ static PF_Err Render(
     ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, green_time, in_data->time_step, in_data->time_scale, &green_param));
     ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, blue_time, in_data->time_step, in_data->time_scale, &blue_param));
 
-    // 16bit”»’è
+    // 16bitï¿½ï¿½ï¿½ï¿½
     if (PF_WORLD_IS_DEEP(outputP)) {
-        // 16bitˆ—
+        // 16bitï¿½ï¿½ï¿½ï¿½
         for (A_long y = 0; y < outputP->height; y++) {
             PF_Pixel16* out_pixel = (PF_Pixel16*)((char*)outputP->data + y * outputP->rowbytes);
             PF_Pixel16* r_pixel = (PF_Pixel16*)((char*)red_param.u.ld.data + y * red_param.u.ld.rowbytes);
@@ -98,7 +98,7 @@ static PF_Err Render(
         }
     }
     else {
-        // 8bitˆ—iŠù‘¶‚ÌƒR[ƒhj
+        // 8bitï¿½ï¿½ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½ï¿½ï¿½ÌƒRï¿½[ï¿½hï¿½j
         for (A_long y = 0; y < outputP->height; y++) {
             PF_Pixel* out_pixel = (PF_Pixel*)((char*)outputP->data + y * outputP->rowbytes);
             PF_Pixel* r_pixel = (PF_Pixel*)((char*)red_param.u.ld.data + y * red_param.u.ld.rowbytes);
@@ -135,11 +135,11 @@ PF_Err PluginDataEntryFunction2(
         inPtr,
         inPluginDataCallBackPtr,
         "RGBDelay",         // Name
-        "ADBE RGBDelay",    // Match Name
-        "Hotkey lab.",        // Category © ‚±‚±‚ğPiPL‚Æˆê’v‚³‚¹‚é
+        "361do RGBDelay",    // Match Name
+        "361do_plugins",        // Category
         AE_RESERVED_INFO,   // Reserved Info
         "EffectMain",       // Entry point
-        "https://www.adobe.com" // Support URL
+        "https://github.com/rebuildup/Ae_RGBDelay" // Support URL
     );
 
     return result;
