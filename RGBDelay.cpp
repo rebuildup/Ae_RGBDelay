@@ -36,12 +36,12 @@ static PF_Err ParamsSetup(
     PF_LayerDef* output)
 {
     PF_Err err = PF_Err_NONE;
-    PF_ParamDef def;                // ���ǉ�
-    AEFX_CLR_STRUCT(def);           // ���ǉ�
+    PF_ParamDef def;
+    AEFX_CLR_STRUCT(def);
 
-    PF_ADD_SLIDER("Red Delay", 0, 30, 0, 30, 0, 1);
-    PF_ADD_SLIDER("Green Delay", 0, 30, 0, 30, 1, 2);
-    PF_ADD_SLIDER("Blue Delay", 0, 30, 0, 30, 2, 3);
+    PF_ADD_SLIDER("Red Delay", RGBDELAY_AMOUNT_MIN, RGBDELAY_AMOUNT_MAX, RGBDELAY_AMOUNT_MIN, RGBDELAY_AMOUNT_MAX, -1, RED_DELAY_DISK_ID);
+    PF_ADD_SLIDER("Green Delay", RGBDELAY_AMOUNT_MIN, RGBDELAY_AMOUNT_MAX, RGBDELAY_AMOUNT_MIN, RGBDELAY_AMOUNT_MAX, -2, GREEN_DELAY_DISK_ID);
+    PF_ADD_SLIDER("Blue Delay", RGBDELAY_AMOUNT_MIN, RGBDELAY_AMOUNT_MAX, RGBDELAY_AMOUNT_MIN, RGBDELAY_AMOUNT_MAX, -3, BLUE_DELAY_DISK_ID);
 
     out_data->num_params = RGBDELAY_NUM_PARAMS;
     return err;
