@@ -33,6 +33,9 @@ struct RGBDelayIterateRefcon {
     A_long g_off_y{};
     A_long b_off_x{};
     A_long b_off_y{};
+    PF_Boolean r_fast{ FALSE };
+    PF_Boolean g_fast{ FALSE };
+    PF_Boolean b_fast{ FALSE };
 };
 
 static PF_Err RGBDelayIterate8(void* refconP, A_long x, A_long y, PF_Pixel* inP, PF_Pixel* outP)
@@ -40,35 +43,48 @@ static PF_Err RGBDelayIterate8(void* refconP, A_long x, A_long y, PF_Pixel* inP,
     (void)inP;
     const RGBDelayIterateRefcon* rc = reinterpret_cast<const RGBDelayIterateRefcon*>(refconP);
 
-    const A_long rx = x + rc->r_off_x;
-    const A_long ry = y + rc->r_off_y;
-    const A_long gx = x + rc->g_off_x;
-    const A_long gy = y + rc->g_off_y;
-    const A_long bx = x + rc->b_off_x;
-    const A_long by = y + rc->b_off_y;
+    const PF_Pixel* r = nullptr;
+    const PF_Pixel* g = nullptr;
+    const PF_Pixel* b = nullptr;
 
-    PF_Pixel r0{0, 0, 0, 0};
-    PF_Pixel g0{0, 0, 0, 0};
-    PF_Pixel b0{0, 0, 0, 0};
-
-    const PF_Pixel* r = &r0;
-    const PF_Pixel* g = &g0;
-    const PF_Pixel* b = &b0;
-
-    if ((unsigned)rx < (unsigned)rc->r_width && (unsigned)ry < (unsigned)rc->r_height) {
-        r = reinterpret_cast<const PF_Pixel*>(rc->r_base + ry * rc->r_rowbytes) + rx;
-    }
-    if ((unsigned)gx < (unsigned)rc->g_width && (unsigned)gy < (unsigned)rc->g_height) {
-        g = reinterpret_cast<const PF_Pixel*>(rc->g_base + gy * rc->g_rowbytes) + gx;
-    }
-    if ((unsigned)bx < (unsigned)rc->b_width && (unsigned)by < (unsigned)rc->b_height) {
-        b = reinterpret_cast<const PF_Pixel*>(rc->b_base + by * rc->b_rowbytes) + bx;
+    if (rc->r_fast) {
+        r = reinterpret_cast<const PF_Pixel*>(rc->r_base + y * rc->r_rowbytes) + x;
+    } else {
+        const A_long rx = x + rc->r_off_x;
+        const A_long ry = y + rc->r_off_y;
+        if ((unsigned)rx < (unsigned)rc->r_width && (unsigned)ry < (unsigned)rc->r_height) {
+            r = reinterpret_cast<const PF_Pixel*>(rc->r_base + ry * rc->r_rowbytes) + rx;
+        }
     }
 
-    outP->red = r->red;
-    outP->green = g->green;
-    outP->blue = b->blue;
-    const int alpha_sum = static_cast<int>(r->alpha) + static_cast<int>(g->alpha) + static_cast<int>(b->alpha);
+    if (rc->g_fast) {
+        g = reinterpret_cast<const PF_Pixel*>(rc->g_base + y * rc->g_rowbytes) + x;
+    } else {
+        const A_long gx = x + rc->g_off_x;
+        const A_long gy = y + rc->g_off_y;
+        if ((unsigned)gx < (unsigned)rc->g_width && (unsigned)gy < (unsigned)rc->g_height) {
+            g = reinterpret_cast<const PF_Pixel*>(rc->g_base + gy * rc->g_rowbytes) + gx;
+        }
+    }
+
+    if (rc->b_fast) {
+        b = reinterpret_cast<const PF_Pixel*>(rc->b_base + y * rc->b_rowbytes) + x;
+    } else {
+        const A_long bx = x + rc->b_off_x;
+        const A_long by = y + rc->b_off_y;
+        if ((unsigned)bx < (unsigned)rc->b_width && (unsigned)by < (unsigned)rc->b_height) {
+            b = reinterpret_cast<const PF_Pixel*>(rc->b_base + by * rc->b_rowbytes) + bx;
+        }
+    }
+
+    const PF_Pixel r0 = r ? *r : PF_Pixel{0, 0, 0, 0};
+    const PF_Pixel g0 = g ? *g : PF_Pixel{0, 0, 0, 0};
+    const PF_Pixel b0 = b ? *b : PF_Pixel{0, 0, 0, 0};
+
+    outP->red = r0.red;
+    outP->green = g0.green;
+    outP->blue = b0.blue;
+    const int alpha_sum = static_cast<int>(r0.alpha) + static_cast<int>(g0.alpha) + static_cast<int>(b0.alpha);
     outP->alpha = static_cast<A_u_char>(alpha_sum > 255 ? 255 : alpha_sum);
     return PF_Err_NONE;
 }
@@ -78,35 +94,48 @@ static PF_Err RGBDelayIterate16(void* refconP, A_long x, A_long y, PF_Pixel16* i
     (void)inP;
     const RGBDelayIterateRefcon* rc = reinterpret_cast<const RGBDelayIterateRefcon*>(refconP);
 
-    const A_long rx = x + rc->r_off_x;
-    const A_long ry = y + rc->r_off_y;
-    const A_long gx = x + rc->g_off_x;
-    const A_long gy = y + rc->g_off_y;
-    const A_long bx = x + rc->b_off_x;
-    const A_long by = y + rc->b_off_y;
+    const PF_Pixel16* r = nullptr;
+    const PF_Pixel16* g = nullptr;
+    const PF_Pixel16* b = nullptr;
 
-    PF_Pixel16 r0{0, 0, 0, 0};
-    PF_Pixel16 g0{0, 0, 0, 0};
-    PF_Pixel16 b0{0, 0, 0, 0};
-
-    const PF_Pixel16* r = &r0;
-    const PF_Pixel16* g = &g0;
-    const PF_Pixel16* b = &b0;
-
-    if ((unsigned)rx < (unsigned)rc->r_width && (unsigned)ry < (unsigned)rc->r_height) {
-        r = reinterpret_cast<const PF_Pixel16*>(rc->r_base + ry * rc->r_rowbytes) + rx;
-    }
-    if ((unsigned)gx < (unsigned)rc->g_width && (unsigned)gy < (unsigned)rc->g_height) {
-        g = reinterpret_cast<const PF_Pixel16*>(rc->g_base + gy * rc->g_rowbytes) + gx;
-    }
-    if ((unsigned)bx < (unsigned)rc->b_width && (unsigned)by < (unsigned)rc->b_height) {
-        b = reinterpret_cast<const PF_Pixel16*>(rc->b_base + by * rc->b_rowbytes) + bx;
+    if (rc->r_fast) {
+        r = reinterpret_cast<const PF_Pixel16*>(rc->r_base + y * rc->r_rowbytes) + x;
+    } else {
+        const A_long rx = x + rc->r_off_x;
+        const A_long ry = y + rc->r_off_y;
+        if ((unsigned)rx < (unsigned)rc->r_width && (unsigned)ry < (unsigned)rc->r_height) {
+            r = reinterpret_cast<const PF_Pixel16*>(rc->r_base + ry * rc->r_rowbytes) + rx;
+        }
     }
 
-    outP->red = r->red;
-    outP->green = g->green;
-    outP->blue = b->blue;
-    outP->alpha = MAX(r->alpha, MAX(g->alpha, b->alpha));
+    if (rc->g_fast) {
+        g = reinterpret_cast<const PF_Pixel16*>(rc->g_base + y * rc->g_rowbytes) + x;
+    } else {
+        const A_long gx = x + rc->g_off_x;
+        const A_long gy = y + rc->g_off_y;
+        if ((unsigned)gx < (unsigned)rc->g_width && (unsigned)gy < (unsigned)rc->g_height) {
+            g = reinterpret_cast<const PF_Pixel16*>(rc->g_base + gy * rc->g_rowbytes) + gx;
+        }
+    }
+
+    if (rc->b_fast) {
+        b = reinterpret_cast<const PF_Pixel16*>(rc->b_base + y * rc->b_rowbytes) + x;
+    } else {
+        const A_long bx = x + rc->b_off_x;
+        const A_long by = y + rc->b_off_y;
+        if ((unsigned)bx < (unsigned)rc->b_width && (unsigned)by < (unsigned)rc->b_height) {
+            b = reinterpret_cast<const PF_Pixel16*>(rc->b_base + by * rc->b_rowbytes) + bx;
+        }
+    }
+
+    const PF_Pixel16 r0 = r ? *r : PF_Pixel16{0, 0, 0, 0};
+    const PF_Pixel16 g0 = g ? *g : PF_Pixel16{0, 0, 0, 0};
+    const PF_Pixel16 b0 = b ? *b : PF_Pixel16{0, 0, 0, 0};
+
+    outP->red = r0.red;
+    outP->green = g0.green;
+    outP->blue = b0.blue;
+    outP->alpha = MAX(r0.alpha, MAX(g0.alpha, b0.alpha));
     return PF_Err_NONE;
 }
 
@@ -121,7 +150,9 @@ static PF_Err GlobalSetup(
     PF_Err err = PF_Err_NONE;
     out_data->my_version = PF_VERSION(MAJOR_VERSION, MINOR_VERSION, BUG_VERSION, STAGE_VERSION, BUILD_VERSION);
     out_data->out_flags = PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT;
-    out_data->out_flags2 = PF_OutFlag2_SUPPORTS_THREADED_RENDERING;
+    // Temporal checkouts (PF_CHECKOUT_PARAM at other times) can deadlock/serialize under AE's multi-frame rendering.
+    // Keep per-frame performance via PF_Iterate, but don't opt into host-level threaded rendering.
+    out_data->out_flags2 = PF_OutFlag2_NONE;
     return err;
 }
 
@@ -246,6 +277,9 @@ static PF_Err Render(
         rc.g_off_y = outputP->origin_y - green_ld->origin_y;
         rc.b_off_x = outputP->origin_x - blue_ld->origin_x;
         rc.b_off_y = outputP->origin_y - blue_ld->origin_y;
+        rc.r_fast = (rc.r_off_x == 0 && rc.r_off_y == 0 && rc.r_width >= outputP->width && rc.r_height >= outputP->height) ? TRUE : FALSE;
+        rc.g_fast = (rc.g_off_x == 0 && rc.g_off_y == 0 && rc.g_width >= outputP->width && rc.g_height >= outputP->height) ? TRUE : FALSE;
+        rc.b_fast = (rc.b_off_x == 0 && rc.b_off_y == 0 && rc.b_width >= outputP->width && rc.b_height >= outputP->height) ? TRUE : FALSE;
 
         if (PF_WORLD_IS_DEEP(outputP)) {
             // Fast path: all channels sample the same source; current 16-bit math becomes a straight copy.
