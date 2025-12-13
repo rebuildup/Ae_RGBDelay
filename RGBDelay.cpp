@@ -19,9 +19,20 @@ struct RGBDelayIterateRefcon {
     A_long r_rowbytes{};
     A_long g_rowbytes{};
     A_long b_rowbytes{};
-    PF_Boolean rg_same{ FALSE };
-    PF_Boolean rb_same{ FALSE };
-    PF_Boolean gb_same{ FALSE };
+    A_long r_width{};
+    A_long r_height{};
+    A_long g_width{};
+    A_long g_height{};
+    A_long b_width{};
+    A_long b_height{};
+    // Offset from output local coords -> source local coords.
+    // src_x = out_x + src_off_x, src_y = out_y + src_off_y
+    A_long r_off_x{};
+    A_long r_off_y{};
+    A_long g_off_x{};
+    A_long g_off_y{};
+    A_long b_off_x{};
+    A_long b_off_y{};
 };
 
 static PF_Err RGBDelayIterate8(void* refconP, A_long x, A_long y, PF_Pixel* inP, PF_Pixel* outP)
@@ -29,9 +40,30 @@ static PF_Err RGBDelayIterate8(void* refconP, A_long x, A_long y, PF_Pixel* inP,
     (void)inP;
     const RGBDelayIterateRefcon* rc = reinterpret_cast<const RGBDelayIterateRefcon*>(refconP);
 
-    const PF_Pixel* r = reinterpret_cast<const PF_Pixel*>(rc->r_base + y * rc->r_rowbytes) + x;
-    const PF_Pixel* g = rc->rg_same ? r : (reinterpret_cast<const PF_Pixel*>(rc->g_base + y * rc->g_rowbytes) + x);
-    const PF_Pixel* b = rc->rb_same ? r : (rc->gb_same ? g : (reinterpret_cast<const PF_Pixel*>(rc->b_base + y * rc->b_rowbytes) + x));
+    const A_long rx = x + rc->r_off_x;
+    const A_long ry = y + rc->r_off_y;
+    const A_long gx = x + rc->g_off_x;
+    const A_long gy = y + rc->g_off_y;
+    const A_long bx = x + rc->b_off_x;
+    const A_long by = y + rc->b_off_y;
+
+    PF_Pixel r0{0, 0, 0, 0};
+    PF_Pixel g0{0, 0, 0, 0};
+    PF_Pixel b0{0, 0, 0, 0};
+
+    const PF_Pixel* r = &r0;
+    const PF_Pixel* g = &g0;
+    const PF_Pixel* b = &b0;
+
+    if ((unsigned)rx < (unsigned)rc->r_width && (unsigned)ry < (unsigned)rc->r_height) {
+        r = reinterpret_cast<const PF_Pixel*>(rc->r_base + ry * rc->r_rowbytes) + rx;
+    }
+    if ((unsigned)gx < (unsigned)rc->g_width && (unsigned)gy < (unsigned)rc->g_height) {
+        g = reinterpret_cast<const PF_Pixel*>(rc->g_base + gy * rc->g_rowbytes) + gx;
+    }
+    if ((unsigned)bx < (unsigned)rc->b_width && (unsigned)by < (unsigned)rc->b_height) {
+        b = reinterpret_cast<const PF_Pixel*>(rc->b_base + by * rc->b_rowbytes) + bx;
+    }
 
     outP->red = r->red;
     outP->green = g->green;
@@ -46,9 +78,30 @@ static PF_Err RGBDelayIterate16(void* refconP, A_long x, A_long y, PF_Pixel16* i
     (void)inP;
     const RGBDelayIterateRefcon* rc = reinterpret_cast<const RGBDelayIterateRefcon*>(refconP);
 
-    const PF_Pixel16* r = reinterpret_cast<const PF_Pixel16*>(rc->r_base + y * rc->r_rowbytes) + x;
-    const PF_Pixel16* g = rc->rg_same ? r : (reinterpret_cast<const PF_Pixel16*>(rc->g_base + y * rc->g_rowbytes) + x);
-    const PF_Pixel16* b = rc->rb_same ? r : (rc->gb_same ? g : (reinterpret_cast<const PF_Pixel16*>(rc->b_base + y * rc->b_rowbytes) + x));
+    const A_long rx = x + rc->r_off_x;
+    const A_long ry = y + rc->r_off_y;
+    const A_long gx = x + rc->g_off_x;
+    const A_long gy = y + rc->g_off_y;
+    const A_long bx = x + rc->b_off_x;
+    const A_long by = y + rc->b_off_y;
+
+    PF_Pixel16 r0{0, 0, 0, 0};
+    PF_Pixel16 g0{0, 0, 0, 0};
+    PF_Pixel16 b0{0, 0, 0, 0};
+
+    const PF_Pixel16* r = &r0;
+    const PF_Pixel16* g = &g0;
+    const PF_Pixel16* b = &b0;
+
+    if ((unsigned)rx < (unsigned)rc->r_width && (unsigned)ry < (unsigned)rc->r_height) {
+        r = reinterpret_cast<const PF_Pixel16*>(rc->r_base + ry * rc->r_rowbytes) + rx;
+    }
+    if ((unsigned)gx < (unsigned)rc->g_width && (unsigned)gy < (unsigned)rc->g_height) {
+        g = reinterpret_cast<const PF_Pixel16*>(rc->g_base + gy * rc->g_rowbytes) + gx;
+    }
+    if ((unsigned)bx < (unsigned)rc->b_width && (unsigned)by < (unsigned)rc->b_height) {
+        b = reinterpret_cast<const PF_Pixel16*>(rc->b_base + by * rc->b_rowbytes) + bx;
+    }
 
     outP->red = r->red;
     outP->green = g->green;
@@ -302,13 +355,22 @@ static PF_Err Render(
         rc.r_rowbytes = red_ld->rowbytes;
         rc.g_rowbytes = green_ld->rowbytes;
         rc.b_rowbytes = blue_ld->rowbytes;
-        rc.rg_same = (red_ld == green_ld) ? TRUE : FALSE;
-        rc.rb_same = (red_ld == blue_ld) ? TRUE : FALSE;
-        rc.gb_same = (green_ld == blue_ld) ? TRUE : FALSE;
+        rc.r_width = red_ld->width;
+        rc.r_height = red_ld->height;
+        rc.g_width = green_ld->width;
+        rc.g_height = green_ld->height;
+        rc.b_width = blue_ld->width;
+        rc.b_height = blue_ld->height;
+        rc.r_off_x = outputP->origin_x - red_ld->origin_x;
+        rc.r_off_y = outputP->origin_y - red_ld->origin_y;
+        rc.g_off_x = outputP->origin_x - green_ld->origin_x;
+        rc.g_off_y = outputP->origin_y - green_ld->origin_y;
+        rc.b_off_x = outputP->origin_x - blue_ld->origin_x;
+        rc.b_off_y = outputP->origin_y - blue_ld->origin_y;
 
         if (PF_WORLD_IS_DEEP(outputP)) {
             // Fast path: all channels sample the same source; current 16-bit math becomes a straight copy.
-            if (rc.rg_same && rc.rb_same) {
+            if (red_ld == green_ld && red_ld == blue_ld && rc.r_off_x == 0 && rc.r_off_y == 0) {
                 err = PF_COPY(const_cast<PF_LayerDef*>(red_ld), outputP, nullptr, nullptr);
             } else {
                 err = suites.Iterate16Suite1()->iterate(
@@ -381,12 +443,21 @@ static PF_Err SmartRender(PF_InData* in_data, PF_OutData* out_data, PF_SmartRend
     rc.r_rowbytes = redW->rowbytes;
     rc.g_rowbytes = greenW->rowbytes;
     rc.b_rowbytes = blueW->rowbytes;
-    rc.rg_same = (redW == greenW) ? TRUE : FALSE;
-    rc.rb_same = (redW == blueW) ? TRUE : FALSE;
-    rc.gb_same = (greenW == blueW) ? TRUE : FALSE;
+    rc.r_width = redW->width;
+    rc.r_height = redW->height;
+    rc.g_width = greenW->width;
+    rc.g_height = greenW->height;
+    rc.b_width = blueW->width;
+    rc.b_height = blueW->height;
+    rc.r_off_x = output->origin_x - redW->origin_x;
+    rc.r_off_y = output->origin_y - redW->origin_y;
+    rc.g_off_x = output->origin_x - greenW->origin_x;
+    rc.g_off_y = output->origin_y - greenW->origin_y;
+    rc.b_off_x = output->origin_x - blueW->origin_x;
+    rc.b_off_y = output->origin_y - blueW->origin_y;
 
     if (PF_WORLD_IS_DEEP(output)) {
-        if (rc.rg_same && rc.rb_same) {
+        if (redW == greenW && redW == blueW && rc.r_off_x == 0 && rc.r_off_y == 0) {
             err = PF_COPY(redW, output, nullptr, nullptr);
         } else {
             err = suites.Iterate16Suite1()->iterate(
