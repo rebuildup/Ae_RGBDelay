@@ -355,15 +355,16 @@ static PF_Err SmartRender(PF_InData* in_data, PF_OutData* out_data, PF_SmartRend
     const A_u_char blue_id = static_cast<A_u_char>((packed >> 16) & 0xFF);
     const A_u_char uniq_count = static_cast<A_u_char>((packed >> 24) & 0xFF);
 
-    PF_EffectWorld* output = nullptr;
-    ERR(extra->cb->checkout_output(in_data->effect_ref, &output));
-    if (err || !output) return err;
-
     PF_EffectWorld* uniq_worlds[4] = { nullptr, nullptr, nullptr, nullptr };
     for (A_u_char id = 1; id <= uniq_count; id++) {
         ERR(extra->cb->checkout_layer_pixels(in_data->effect_ref, id, &uniq_worlds[id]));
         if (err || !uniq_worlds[id]) return err;
     }
+
+    // Must checkout at least one input before checking out output (25::244).
+    PF_EffectWorld* output = nullptr;
+    ERR(extra->cb->checkout_output(in_data->effect_ref, &output));
+    if (err || !output) return err;
 
     PF_EffectWorld* redW = uniq_worlds[red_id];
     PF_EffectWorld* greenW = uniq_worlds[green_id];
