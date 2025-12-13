@@ -148,21 +148,17 @@ static PF_Err SmartPreRender(PF_InData* in_data, PF_OutData* out_data, PF_PreRen
 
     PF_RenderRequest req = pre->input->output_request;
 
-    // Compute max_result_rect across all sampled times via "bounds checkouts" (empty request_rect).
-    PF_Rect max_rect{0, 0, 0, 0};
-    for (int i = 0; i < uniq_count; i++) {
-        PF_CheckoutResult bounds_result;
-        AEFX_CLR_STRUCT(bounds_result);
-
+    // Compute max_result_rect via a single "bounds checkout" at current_time (recommended pattern).
+    // The output bounds for this effect are the same as the input bounds at the current frame.
+    PF_CheckoutResult bounds_result;
+    AEFX_CLR_STRUCT(bounds_result);
+    {
         PF_RenderRequest bounds_req = req;
         bounds_req.rect.left = bounds_req.rect.top = bounds_req.rect.right = bounds_req.rect.bottom = 0;
-
-        const A_long bounds_checkout_id = 100 + i;
-        ERR(pre->cb->checkout_layer(in_data->effect_ref, RGBDELAY_INPUT, bounds_checkout_id, &bounds_req,
-            uniq_times[i], in_data->time_step, in_data->time_scale, &bounds_result));
+        const A_long kCheckoutIdBounds = 100;
+        ERR(pre->cb->checkout_layer(in_data->effect_ref, RGBDELAY_INPUT, kCheckoutIdBounds, &bounds_req,
+            in_data->current_time, in_data->time_step, in_data->time_scale, &bounds_result));
         if (err) return err;
-
-        UnionRect(&max_rect, &bounds_result.max_result_rect);
     }
 
     // Pixel checkouts for requested ROI at each unique time.
@@ -185,7 +181,14 @@ static PF_Err SmartPreRender(PF_InData* in_data, PF_OutData* out_data, PF_PreRen
     pre->output->pre_render_data = reinterpret_cast<void*>((intptr_t)packed);
 
     pre->output->result_rect = req.rect;
-    pre->output->max_result_rect = max_rect;
+    pre->output->max_result_rect = bounds_result.max_result_rect;
+    // Ensure invariants: max_result_rect must be valid and must enclose result_rect.
+    if (pre->output->max_result_rect.left >= pre->output->max_result_rect.right ||
+        pre->output->max_result_rect.top >= pre->output->max_result_rect.bottom) {
+        pre->output->max_result_rect = pre->output->result_rect;
+    } else {
+        UnionRect(&pre->output->max_result_rect, &pre->output->result_rect);
+    }
 
     return err;
 }
