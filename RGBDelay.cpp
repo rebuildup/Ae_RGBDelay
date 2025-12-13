@@ -73,37 +73,67 @@ static PF_Err Render(
     if (blue_time < 0) blue_time = 0;
     if (blue_time > max_time) blue_time = max_time;
 
-    // �e�`�����l���p�ɉߋ��t���[�����擾
-    PF_ParamDef red_param, green_param, blue_param;
-    AEFX_CLR_STRUCT(red_param);
-    AEFX_CLR_STRUCT(green_param);
-    AEFX_CLR_STRUCT(blue_param);
-    
-    PF_Boolean checked_out_red = FALSE, checked_out_green = FALSE, checked_out_blue = FALSE;
+    struct CheckedOutSource {
+        A_long time{};
+        PF_ParamDef param{};
+        PF_Boolean checked_out{ FALSE };
+    };
 
-    ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, red_time, in_data->time_step, in_data->time_scale, &red_param));
-    if (!err) checked_out_red = TRUE;
-    
+    CheckedOutSource sources[3]{};
+    int sources_count = 0;
+
+    const PF_LayerDef* input_ld = &params[RGBDELAY_INPUT]->u.ld;
+    const PF_LayerDef* red_ld = nullptr;
+    const PF_LayerDef* green_ld = nullptr;
+    const PF_LayerDef* blue_ld = nullptr;
+
+    auto resolve_layer_at_time = [&](A_long t, const PF_LayerDef** out_ld) -> PF_Err {
+        if (t == in_data->current_time) {
+            *out_ld = input_ld;
+            return PF_Err_NONE;
+        }
+
+        for (int i = 0; i < sources_count; i++) {
+            if (sources[i].time == t) {
+                *out_ld = &sources[i].param.u.ld;
+                return PF_Err_NONE;
+            }
+        }
+
+        if (sources_count >= 3) {
+            return PF_Err_INTERNAL_STRUCT_DAMAGED;
+        }
+
+        sources[sources_count].time = t;
+        AEFX_CLR_STRUCT(sources[sources_count].param);
+        ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, t, in_data->time_step, in_data->time_scale, &sources[sources_count].param));
+        if (!err) {
+            sources[sources_count].checked_out = TRUE;
+            *out_ld = &sources[sources_count].param.u.ld;
+            sources_count++;
+        }
+
+        return err;
+    };
+
+    ERR(resolve_layer_at_time(red_time, &red_ld));
     if (!err) {
-        ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, green_time, in_data->time_step, in_data->time_scale, &green_param));
-        if (!err) checked_out_green = TRUE;
+        ERR(resolve_layer_at_time(green_time, &green_ld));
     }
-    
     if (!err) {
-        ERR(PF_CHECKOUT_PARAM(in_data, RGBDELAY_INPUT, blue_time, in_data->time_step, in_data->time_scale, &blue_param));
-        if (!err) checked_out_blue = TRUE;
+        ERR(resolve_layer_at_time(blue_time, &blue_ld));
     }
 
     // Only render if all checkouts succeeded
-    if (!err && checked_out_red && checked_out_green && checked_out_blue) {
+    if (!err && red_ld && green_ld && blue_ld) {
         // 16bit����
         if (PF_WORLD_IS_DEEP(outputP)) {
         // 16bit����
         for (A_long y = 0; y < outputP->height; y++) {
             PF_Pixel16* out_pixel = (PF_Pixel16*)((char*)outputP->data + y * outputP->rowbytes);
-            PF_Pixel16* r_pixel = (PF_Pixel16*)((char*)red_param.u.ld.data + y * red_param.u.ld.rowbytes);
-            PF_Pixel16* g_pixel = (PF_Pixel16*)((char*)green_param.u.ld.data + y * green_param.u.ld.rowbytes);
-            PF_Pixel16* b_pixel = (PF_Pixel16*)((char*)blue_param.u.ld.data + y * blue_param.u.ld.rowbytes);
+            PF_Pixel16* r_pixel = (PF_Pixel16*)((char*)red_ld->data + y * red_ld->rowbytes);
+            PF_Pixel16* g_pixel = (PF_Pixel16*)((char*)green_ld->data + y * green_ld->rowbytes);
+            PF_Pixel16* b_pixel = (PF_Pixel16*)((char*)blue_ld->data + y * blue_ld->rowbytes);
 
             for (A_long x = 0; x < outputP->width; x++) {
                 out_pixel[x].red = r_pixel[x].red;
@@ -117,9 +147,9 @@ static PF_Err Render(
         // 8bit�����i�����̃R�[�h�j
         for (A_long y = 0; y < outputP->height; y++) {
             PF_Pixel* out_pixel = (PF_Pixel*)((char*)outputP->data + y * outputP->rowbytes);
-            PF_Pixel* r_pixel = (PF_Pixel*)((char*)red_param.u.ld.data + y * red_param.u.ld.rowbytes);
-            PF_Pixel* g_pixel = (PF_Pixel*)((char*)green_param.u.ld.data + y * green_param.u.ld.rowbytes);
-            PF_Pixel* b_pixel = (PF_Pixel*)((char*)blue_param.u.ld.data + y * blue_param.u.ld.rowbytes);
+            PF_Pixel* r_pixel = (PF_Pixel*)((char*)red_ld->data + y * red_ld->rowbytes);
+            PF_Pixel* g_pixel = (PF_Pixel*)((char*)green_ld->data + y * green_ld->rowbytes);
+            PF_Pixel* b_pixel = (PF_Pixel*)((char*)blue_ld->data + y * blue_ld->rowbytes);
 
             for (A_long x = 0; x < outputP->width; x++) {
                 out_pixel[x].red = r_pixel[x].red;
@@ -133,14 +163,10 @@ static PF_Err Render(
     }  // End of render block
 
     // �`�F�b�N�C���i�`�F�b�N�A�E�g�����̂݁j
-    if (checked_out_blue) {
-        PF_CHECKIN_PARAM(in_data, &blue_param);
-    }
-    if (checked_out_green) {
-        PF_CHECKIN_PARAM(in_data, &green_param);
-    }
-    if (checked_out_red) {
-        PF_CHECKIN_PARAM(in_data, &red_param);
+    for (int i = sources_count - 1; i >= 0; i--) {
+        if (sources[i].checked_out) {
+            PF_CHECKIN_PARAM(in_data, &sources[i].param);
+        }
     }
     
     return err;
