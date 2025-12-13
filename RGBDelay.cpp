@@ -150,9 +150,7 @@ static PF_Err GlobalSetup(
     PF_Err err = PF_Err_NONE;
     out_data->my_version = PF_VERSION(MAJOR_VERSION, MINOR_VERSION, BUG_VERSION, STAGE_VERSION, BUILD_VERSION);
     out_data->out_flags = PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT;
-    // Temporal checkouts (PF_CHECKOUT_PARAM at other times) can deadlock/serialize under AE's multi-frame rendering.
-    // Keep per-frame performance via PF_Iterate, but don't opt into host-level threaded rendering.
-    out_data->out_flags2 = PF_OutFlag2_NONE;
+    out_data->out_flags2 = PF_OutFlag2_SUPPORTS_THREADED_RENDERING;
     return err;
 }
 
