@@ -149,7 +149,12 @@ static PF_Err GlobalSetup(
 {
     PF_Err err = PF_Err_NONE;
     out_data->my_version = PF_VERSION(MAJOR_VERSION, MINOR_VERSION, BUG_VERSION, STAGE_VERSION, BUILD_VERSION);
-    out_data->out_flags = PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT;
+    // Tell the host that we sample frames at times other than the one being rendered.
+    // Without PF_OutFlag_WIDE_TIME_INPUT, AE may reuse cached frames even after the
+    // delay sliders change, leaving old imagery visible.
+    out_data->out_flags = PF_OutFlag_DEEP_COLOR_AWARE |
+        PF_OutFlag_PIX_INDEPENDENT |
+        PF_OutFlag_WIDE_TIME_INPUT;
     out_data->out_flags2 = PF_OutFlag2_SUPPORTS_THREADED_RENDERING;
     return err;
 }
