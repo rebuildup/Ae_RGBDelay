@@ -926,6 +926,10 @@ jobs:
             fi
             
             echo "  DMG path: $DMG_PATH"
+            
+            # Remove standalone .plugin from artifacts (it's now inside the DMG)
+            echo "Removing standalone .plugin from artifacts (now packaged in DMG)..."
+            rm -rf "$PLUGIN_ARTIFACT_PATH"
           else
             echo "::warning::Notarization timed out or failed. The plugin is signed but not notarized."
             echo "::warning::You can check notarization status with: xcrun notarytool history --apple-id YOUR_APPLE_ID --team-id YOUR_TEAM_ID"
