@@ -127,21 +127,13 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D0FE57610993C4E900139A60 /* RGBDelayPiPL.r in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXRezBuildPhase section */
-		C4E618EA095A3E040012CA3F /* Rez */ = {
-			isa = PBXRezBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				D0FE57610993C4E900139A60 /* RGBDelayPiPL.r in Rez */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXRezBuildPhase section */
+
 
 /* Begin PBXSourcesBuildPhase section */
 		C4E618C9095A3CE80012CA3F /* Sources */ = {
