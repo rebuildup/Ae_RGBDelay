@@ -161,6 +161,7 @@
 		C4E61880095A3C800012CA3F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				COPY_PHASE_STRIP = NO;
 				ENABLE_TESTABILITY = YES;
 				GCC_INPUT_FILETYPE = sourcecode.cpp.objcpp;
