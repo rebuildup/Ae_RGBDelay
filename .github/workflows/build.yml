@@ -879,21 +879,53 @@ jobs:
             cp -R "$PLUGIN_ARTIFACT_PATH" "$TEMP_DMG_DIR/"
             
             # Create DMG
+            echo "Creating DMG..."
             hdiutil create -volname "RGBDelay" -srcfolder "$TEMP_DMG_DIR" -ov -format UDZO "$DMG_PATH"
-            
-            # Staple the notarization ticket to the DMG
-            echo "Stapling notarization ticket to DMG..."
-            xcrun stapler staple "$DMG_PATH"
-            
-            # Verify stapling
-            echo "Verifying DMG stapling..."
-            xcrun stapler validate "$DMG_PATH"
-            
-            echo "✓ Distribution DMG created and stapled successfully"
-            echo "  DMG path: $DMG_PATH"
             
             # Cleanup temp directory
             rm -rf "$TEMP_DMG_DIR"
+            
+            # Notarize the DMG
+            echo "Submitting DMG to Apple for notarization..."
+            DMG_SUBMISSION_ID=$(xcrun notarytool submit "$DMG_PATH" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_ID_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait \
+              --timeout 20m \
+              --output-format json | jq -r '.id')
+            
+            if [ -z "$DMG_SUBMISSION_ID" ] || [ "$DMG_SUBMISSION_ID" = "null" ]; then
+              echo "::warning::Failed to get DMG submission ID"
+            else
+              echo "DMG notarization submission ID: $DMG_SUBMISSION_ID"
+              
+              # Check notarization status
+              DMG_STATUS=$(xcrun notarytool info "$DMG_SUBMISSION_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_ID_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" \
+                --output-format json | jq -r '.status')
+              
+              if [ "$DMG_STATUS" = "Accepted" ]; then
+                echo "✓ DMG notarization accepted"
+                
+                # Staple the notarization ticket to the DMG
+                echo "Stapling notarization ticket to DMG..."
+                xcrun stapler staple "$DMG_PATH"
+                
+                # Verify stapling
+                echo "Verifying DMG stapling..."
+                xcrun stapler validate "$DMG_PATH"
+                
+                echo "✓ Distribution DMG created, notarized, and stapled successfully"
+              else
+                echo "::warning::DMG notarization status: $DMG_STATUS"
+                echo "::warning::DMG created but not stapled"
+              fi
+            fi
+            
+            echo "  DMG path: $DMG_PATH"
           else
             echo "::warning::Notarization timed out or failed. The plugin is signed but not notarized."
             echo "::warning::You can check notarization status with: xcrun notarytool history --apple-id YOUR_APPLE_ID --team-id YOUR_TEAM_ID"
