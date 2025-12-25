@@ -450,7 +450,7 @@ jobs:
         run: |
           echo "Copying plugin to SDK Template directory..."
           
-          PLUGIN_DIR="$SDK_ROOT/Template/MultiSlicer"
+          PLUGIN_DIR="$SDK_ROOT/Template/RGBDelay"
           mkdir -p "$PLUGIN_DIR"
           
           rsync -av \
@@ -472,7 +472,7 @@ jobs:
         run: |
           Write-Host "Copying plugin to SDK Template directory..."
           
-          $pluginDir = "$env:SDK_ROOT\Template\MultiSlicer"
+          $pluginDir = "$env:SDK_ROOT\Template\RGBDelay"
           New-Item -ItemType Directory -Path $pluginDir -Force | Out-Null
           
           $excludeDirs = @('.git', 'tmp', 'ae_sdk_work', '.github', 'output')
@@ -499,7 +499,7 @@ jobs:
           
           cd "$PLUGIN_DIR/Mac"
           
-          if [ ! -f "MultiSlicer.xcodeproj/project.pbxproj" ]; then
+          if [ ! -f "RGBDelay.xcodeproj/project.pbxproj" ]; then
             echo "Error: Xcode project not found"
             ls -la
             exit 1
@@ -518,8 +518,8 @@ jobs:
           
           set +e
           xcodebuild build \
-            -project MultiSlicer.xcodeproj \
-            -target MultiSlicer \
+            -project RGBDelay.xcodeproj \
+            -target RGBDelay \
             -configuration Debug \
             -sdk macosx \
             -arch x86_64 \
@@ -529,7 +529,7 @@ jobs:
             HEADER_SEARCH_PATHS="$SDK_ROOT/Headers $SDK_ROOT/Util $SDK_ROOT/Headers/SP $SDK_ROOT/Resources" \
             REZ_SEARCH_PATHS="$SDK_ROOT/Headers $SDK_ROOT/Headers/SP $SDK_ROOT/Resources" \
             GCC_SYMBOLS_PRIVATE_EXTERN=NO \
-            EXPORTED_SYMBOLS_FILE="$(pwd)/MultiSlicer.exp" \
+            EXPORTED_SYMBOLS_FILE="$(pwd)/RGBDelay.exp" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -551,7 +551,7 @@ jobs:
           echo "Searching for build artifact..."
           PLUGIN_PATH=""
           
-          for search_path in "build/MultiSlicer.plugin" "build/Debug/MultiSlicer.plugin" "build/Release/MultiSlicer.plugin"; do
+          for search_path in "build/RGBDelay.plugin" "build/Debug/RGBDelay.plugin" "build/Release/RGBDelay.plugin"; do
             if [ -d "$search_path" ]; then
               PLUGIN_PATH="$search_path"
               break
@@ -559,7 +559,7 @@ jobs:
           done
           
           if [ -z "$PLUGIN_PATH" ]; then
-            PLUGIN_PATH=$(find build -name "MultiSlicer.plugin" -type d 2>/dev/null | head -1)
+            PLUGIN_PATH=$(find build -name "RGBDelay.plugin" -type d 2>/dev/null | head -1)
           fi
           
           if [ -n "$PLUGIN_PATH" ]; then
@@ -570,8 +570,8 @@ jobs:
             echo "Plugin path: $PLUGIN_PATH"
             ls -laR "$PLUGIN_PATH" || true
             
-            BINARY_PATH="$PLUGIN_PATH/Contents/MacOS/MultiSlicer"
-            RSRC_PATH="$PLUGIN_PATH/Contents/Resources/MultiSlicer.rsrc"
+            BINARY_PATH="$PLUGIN_PATH/Contents/MacOS/RGBDelay"
+            RSRC_PATH="$PLUGIN_PATH/Contents/Resources/RGBDelay.rsrc"
             INFO_PATH="$PLUGIN_PATH/Contents/Info.plist"
             
             # Verify Info.plist
@@ -638,7 +638,7 @@ jobs:
 
             mkdir -p "${{ github.workspace }}/artifacts"
             cp -R "$PLUGIN_PATH" "${{ github.workspace }}/artifacts/"
-            echo "Artifact copied: artifacts/MultiSlicer.plugin"
+            echo "Artifact copied: artifacts/RGBDelay.plugin"
           else
             echo "::error::Build artifact not found"
             echo "Build directory contents:"
@@ -660,7 +660,7 @@ jobs:
           
           Set-Location "$env:PLUGIN_DIR\Win"
           
-          if (-not (Test-Path "MultiSlicer.sln")) {
+          if (-not (Test-Path "RGBDelay.sln")) {
             Write-Host "Error: Solution file not found"
             Get-ChildItem
             exit 1
@@ -673,7 +673,7 @@ jobs:
           Write-Host "  Configuration: Release"
           Write-Host "  Platform: x64"
           
-          msbuild MultiSlicer.sln `
+          msbuild RGBDelay.sln `
             /p:Configuration=Release `
             /p:Platform=x64 `
             /t:Build `
@@ -699,10 +699,10 @@ jobs:
           Write-Host "Searching for build artifact..."
           
           $searchPaths = @(
-            "x64\Release\MultiSlicer.aex",
-            "..\output\MultiSlicer.aex",
-            "Release\MultiSlicer.aex",
-            ".\MultiSlicer.aex"
+            "x64\Release\RGBDelay.aex",
+            "..\output\RGBDelay.aex",
+            "Release\RGBDelay.aex",
+            ".\RGBDelay.aex"
           )
           
           $aexPath = $null
@@ -714,14 +714,14 @@ jobs:
           }
           
           if (-not $aexPath) {
-            $aexPath = Get-ChildItem -Path . -Filter "MultiSlicer.aex" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            $aexPath = Get-ChildItem -Path . -Filter "RGBDelay.aex" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
           }
           
           if ($aexPath) {
             $artifactsDir = "${{ github.workspace }}\artifacts"
             New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
             Copy-Item -Path $aexPath.FullName -Destination $artifactsDir -Force
-            Write-Host "Artifact copied: $artifactsDir\MultiSlicer.aex"
+            Write-Host "Artifact copied: $artifactsDir\RGBDelay.aex"
           } else {
             Write-Host "Error: Build artifact not found"
             Get-ChildItem -Recurse -Depth 3 | Where-Object { $_.Extension -eq ".aex" -or $_.Name -like "*.obj" } | Select-Object FullName | Format-Table -AutoSize
@@ -738,7 +738,7 @@ jobs:
         run: |
           set -e
           
-          PLUGIN_ARTIFACT_PATH="${{ github.workspace }}/artifacts/MultiSlicer.plugin"
+          PLUGIN_ARTIFACT_PATH="${{ github.workspace }}/artifacts/RGBDelay.plugin"
           
           if [ -z "$MACOS_CODESIGN_IDENTITY" ] || [ -z "$MACOS_CODESIGN_P12" ] || [ -z "$MACOS_CODESIGN_PASSWORD" ]; then
             echo "::warning::Code signing secrets not set; applying ad-hoc signature only"
@@ -826,7 +826,7 @@ jobs:
         run: |
           set -e
           
-          PLUGIN_ARTIFACT_PATH="${{ github.workspace }}/artifacts/MultiSlicer.plugin"
+          PLUGIN_ARTIFACT_PATH="${{ github.workspace }}/artifacts/RGBDelay.plugin"
           
           if [ -z "$APPLE_ID" ] || [ -z "$APPLE_ID_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
             echo "::warning::Notarization secrets not set; skipping notarization"
@@ -844,7 +844,7 @@ jobs:
           fi
           
           echo "Creating ZIP archive for notarization..."
-          ZIP_PATH="$RUNNER_TEMP/MultiSlicer.zip"
+          ZIP_PATH="$RUNNER_TEMP/RGBDelay.zip"
           ditto -c -k --keepParent "$PLUGIN_ARTIFACT_PATH" "$ZIP_PATH"
           
           echo "Submitting to Apple for notarization..."
@@ -885,7 +885,7 @@ jobs:
             exit 1
           }
           $dumpbinPath = $dumpbinCmd.Source
-          $artifactPath = Join-Path "${{ github.workspace }}" "artifacts\MultiSlicer.aex"
+          $artifactPath = Join-Path "${{ github.workspace }}" "artifacts\RGBDelay.aex"
           if (-not (Test-Path $artifactPath)) {
             Write-Host "::error::Artifact not found at $artifactPath"
             exit 1
@@ -896,7 +896,7 @@ jobs:
           $hasEffectMain = $dumpbinOutput -match '\bEffectMain\b'
           $hasPluginData = $dumpbinOutput -match '\bPluginDataEntryFunction2\b'
           if (-not $hasEffectMain -or -not $hasPluginData) {
-            Write-Host "::error::Required exports not found in MultiSlicer.aex"
+            Write-Host "::error::Required exports not found in RGBDelay.aex"
             exit 1
           }
           Write-Host "✓ Verified exports: EffectMain, PluginDataEntryFunction2"
@@ -904,7 +904,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MultiSlicer-${{ matrix.platform }}
+          name: RGBDelay-${{ matrix.platform }}
           path: artifacts/
           retention-days: 30
           if-no-files-found: error
