@@ -8,7 +8,7 @@ typedef struct {
 TableString g_strs[StrID_NUMTYPES] = {
     StrID_NONE,             "",
     StrID_Name,             "RGBDelay",
-    StrID_Description,      "RGBごとにディレイをかけるサンプルプラグイン。\rCopyright 2023 okmr",
+    StrID_Description,      "RGB縺斐→縺ｫ繝�繧｣繝ｬ繧､繧偵°縺代ｋ繧ｵ繝ｳ繝励Ν繝励Λ繧ｰ繧､繝ｳ縲�\rCopyright 2023 okmr",
     StrID_RedDelay_Param_Name,   "Red Delay",
     StrID_GreenDelay_Param_Name, "Green Delay",
     StrID_BlueDelay_Param_Name,  "Blue Delay",
@@ -19,7 +19,7 @@ TableString g_strs[StrID_NUMTYPES] = {
     StrID_Exception,        "Caught an exception! Uh-oh, missing suite..."
 };
 
-char* GetStringPtr(int strNum)
+extern "C" char* GetStringPtr(int strNum)
 {
     return g_strs[strNum].str;
 }
