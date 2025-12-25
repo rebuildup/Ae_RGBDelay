@@ -859,10 +859,14 @@ jobs:
             --timeout 20m; then
             
             echo "Stapling notarization ticket to plugin..."
-            xcrun stapler staple "$PLUGIN_ARTIFACT_PATH"
-            
-            echo "Verifying notarization..."
-            xcrun stapler validate "$PLUGIN_ARTIFACT_PATH" || true
+            # Note: stapler doesn't support .plugin bundles, but notarization is already complete
+            if xcrun stapler staple "$PLUGIN_ARTIFACT_PATH" 2>&1 | grep -q "incapable"; then
+              echo "::notice::Stapling not supported for .plugin bundles (this is expected)"
+              echo "::notice::The plugin is notarized and will be verified online by macOS"
+            else
+              echo "Verifying notarization..."
+              xcrun stapler validate "$PLUGIN_ARTIFACT_PATH" || true
+            fi
             
             echo "✓ Notarization completed successfully"
           else
