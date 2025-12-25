@@ -850,13 +850,13 @@ jobs:
           echo "Submitting to Apple for notarization..."
           echo "This may take several minutes..."
           
-          # Submit and wait with shorter timeout, continue on timeout
+          # Submit and wait with extended timeout for notarization
           if xcrun notarytool submit "$ZIP_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait \
-            --timeout 10m; then
+            --timeout 20m; then
             
             echo "Stapling notarization ticket to plugin..."
             xcrun stapler staple "$PLUGIN_ARTIFACT_PATH"
