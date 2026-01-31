@@ -1,14 +1,12 @@
 #pragma once
 
-#ifndef RGBDELAY_H
-#define RGBDELAY_H
-
 #define PF_DEEP_COLOR_AWARE 1
 
 #include "AEConfig.h"
 
 #ifdef AE_OS_WIN
-    typedef unsigned short PixelType;
+    // Use a unique name to avoid collision with After Effects SDK types
+    typedef unsigned short RGBDelay_WinReservedType;
     #include <Windows.h>
 #endif
 
@@ -54,6 +52,12 @@ enum {
     BLUE_DELAY_DISK_ID
 };
 
+// Plugin identification constants
+#define RGBDELAY_MATCH_NAME    "361do_RGBDelay"
+#define RGBDELAY_CATEGORY       "361do_plugins"
+#define RGBDELAY_NAME           "RGBDelay"
+#define RGBDELAY_SUPPORT_URL    "https://github.com/rebuildup/Ae_RGBDelay"
+
 extern "C" {
     DllExport
     PF_Err
@@ -72,5 +76,3 @@ extern "C" {
         const char *inHostName,
         const char *inHostVersion);
 }
-
-#endif // RGBDELAY_H

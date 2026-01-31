@@ -8,7 +8,7 @@ typedef struct {
 TableString g_strs[StrID_NUMTYPES] = {
     StrID_NONE,             "",
     StrID_Name,             "RGBDelay",
-    StrID_Description,      "RGBごとにディレイをかけるサンプルプラグイン。\rCopyright 2023 okmr",
+    StrID_Description,      "RGBごとにディレイをかけるサンプルプラグイン。\rCopyright (C) 2024 Tsuyoshi Okumura/Hotkey ltd.",
     StrID_RedDelay_Param_Name,   "Red Delay",
     StrID_GreenDelay_Param_Name, "Green Delay",
     StrID_BlueDelay_Param_Name,  "Blue Delay",

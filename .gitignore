@@ -361,3 +361,28 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# After Effects plugin build outputs
+*.aex
+*.aex.plugin
+*.bundle/
+*.plugin/
+
+# Build intermediate files
+Build/
+F5/
+
+# Mac resource forks and metadata
+._*
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows thumbnail cache
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Debug files
+*.exp
+*.lib

@@ -23,7 +23,7 @@ resource 'PiPL' (16000) {
         },
         /* [3] */
         Category {
-            "361do_plugins"
+            "361do"
         },
 #ifdef AE_OS_WIN
     #ifdef AE_PROC_INTELx64
@@ -47,22 +47,28 @@ resource 'PiPL' (16000) {
         },
         /* [8] */
         AE_Effect_Version {
-            524289    /* PF_VERSION(1,0,0,PF_Stage_DEVELOP,1) == 0x80001 */
+            524289    /* Calculated from version macros in RGBDelay.h:
+                        MAJOR_VERSION=1, MINOR_VERSION=0, BUG_VERSION=0,
+                        STAGE_VERSION=PF_Stage_DEVELOP, BUILD_VERSION=1 */
         },
         /* [9] */
         AE_Effect_Info_Flags {
             0
         },
         /* [10] */
+        /* Must match GlobalSetup() in RGBDelay.cpp:
+           PF_OutFlag_DEEP_COLOR_AWARE | PF_OutFlag_PIX_INDEPENDENT | PF_OutFlag_WIDE_TIME_INPUT */
         AE_Effect_Global_OutFlags {
             0x02000402
         },
+        /* Must match GlobalSetup() in RGBDelay.cpp:
+           PF_OutFlag2_SUPPORTS_THREADED_RENDERING */
         AE_Effect_Global_OutFlags_2 {
             0x08000000
         },
         /* [11] */
         AE_Effect_Match_Name {
-            "361do RGBDelay"
+            "361do_RGBDelay"
         },
         /* [12] */
         AE_Reserved_Info {
