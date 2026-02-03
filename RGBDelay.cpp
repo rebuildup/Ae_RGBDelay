@@ -6,6 +6,7 @@
 #include "AE_Macros.h"
 #include "String_Utils.h"
 #include "RGBDelay.h"
+#include <climits>
 
 // Zero pixel constants (alpha, red, green, blue order per PF_Pixel definition)
 static const PF_Pixel kZeroPixel8 = {0, 0, 0, 0};
@@ -50,7 +51,7 @@ static inline const PixelType* get_channel_ptr(
     if (fast) {
         if (y < height && x < width) {
             // Check for overflow in y * rowbytes calculation
-            if (y > 0 && rowbytes > A_LONG_MAX / y) {
+            if (y > 0 && rowbytes > LONG_MAX / y) {
                 return nullptr;  // Overflow would occur
             }
             return reinterpret_cast<const PixelType*>(base + y * rowbytes) + x;
@@ -61,7 +62,7 @@ static inline const PixelType* get_channel_ptr(
         const A_long src_y = y + off_y;
         if (src_x >= 0 && src_x < width && src_y >= 0 && src_y < height) {
             // Check for overflow in src_y * rowbytes calculation
-            if (src_y > 0 && rowbytes > A_LONG_MAX / src_y) {
+            if (src_y > 0 && rowbytes > LONG_MAX / src_y) {
                 return nullptr;  // Overflow would occur
             }
             return reinterpret_cast<const PixelType*>(base + src_y * rowbytes) + src_x;
@@ -119,7 +120,7 @@ static PF_Err RGBDelayIterate16(void* refconP, A_long x, A_long y, PF_Pixel16* i
 // Helper function for safe subtraction with overflow check
 inline bool safe_sub(A_long a, A_long b, A_long* result) {
     // Check for overflow: if a and b have different signs, subtraction may overflow
-    if ((b >= 0 && a < A_LONG_MIN + b) || (b < 0 && a > A_LONG_MAX + b)) {
+    if ((b >= 0 && a < LONG_MIN + b) || (b < 0 && a > LONG_MAX + b)) {
         return false;  // Overflow would occur
     }
     *result = a - b;
@@ -143,14 +144,14 @@ inline PF_Boolean compute_fast_flag(A_long off_x, A_long off_y, A_long src_width
     // Check for overflow in subtraction before comparison
     // If off_x is very negative, out_width - off_x could overflow
     A_long required_width;
-    if (off_x < 0 && out_width > A_LONG_MAX + off_x) {
+    if (off_x < 0 && out_width > LONG_MAX + off_x) {
         // Would overflow: required width exceeds maximum
         return FALSE;
     }
     required_width = out_width - off_x;
 
     A_long required_height;
-    if (off_y < 0 && out_height > A_LONG_MAX + off_y) {
+    if (off_y < 0 && out_height > LONG_MAX + off_y) {
         // Would overflow: required height exceeds maximum
         return FALSE;
     }
@@ -228,9 +229,9 @@ static PF_Err Render(
         // delay is in range [-100, 100], time_step could be large
         A_long abs_delay = (delay >= 0) ? delay : -delay;
         if (abs_delay > 0 && in_data->time_step > 0 &&
-            abs_delay > A_LONG_MAX / in_data->time_step) {
+            abs_delay > LONG_MAX / in_data->time_step) {
             // Overflow would occur, clamp to maximum safe delay
-            abs_delay = A_LONG_MAX / in_data->time_step;
+            abs_delay = LONG_MAX / in_data->time_step;
         }
 
         if (delay >= 0) {
@@ -270,7 +271,7 @@ static PF_Err Render(
 
     // Validate input parameter
     if (!params || !params[RGBDELAY_INPUT]) {
-        return PF_Err_INVALID_PARAM;
+        return PF_Err_INTERNAL_STRUCT_DAMAGED;
     }
 
     const PF_LayerDef* input_ld = &params[RGBDELAY_INPUT]->u.ld;
