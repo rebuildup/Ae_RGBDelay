@@ -386,3 +386,7 @@ Desktop.ini
 # Debug files
 *.exp
 *.lib
+# XcodeGen project and host-specific local paths
+/RGBDelay.xcodeproj/
+/build/
+/.env.local
